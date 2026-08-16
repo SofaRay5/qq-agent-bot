@@ -1,0 +1,30 @@
+[project]
+name = "qq-agent-bot"
+version = "0.1.0"
+description = "工程化 QQ 智能机器人：OneBot v11 + LangChain/LangGraph"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "mypy",
+    "pytest",
+    "pytest-asyncio",
+    "pre-commit",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
