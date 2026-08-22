@@ -1,0 +1,24 @@
+{
+  "time": 1700000000,
+  "self_id": 123456,
+  "post_type": "message",
+  "message_type": "group",
+  "sub_type": "normal",
+  "message_id": 2,
+  "group_id": 999,
+  "user_id": 111,
+  "message": [
+    {
+      "type": "text",
+      "data": {
+        "text": "hi"
+      }
+    }
+  ],
+  "raw_message": "hi",
+  "font": 0,
+  "sender": {
+    "user_id": 111,
+    "nickname": "小明"
+  }
+}

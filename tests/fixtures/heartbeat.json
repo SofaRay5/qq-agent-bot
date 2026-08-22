@@ -1,0 +1,8 @@
+{
+  "time": 1700000000,
+  "self_id": 123456,
+  "post_type": "meta_event",
+  "meta_event_type": "heartbeat",
+  "status": {},
+  "interval": 15000
+}

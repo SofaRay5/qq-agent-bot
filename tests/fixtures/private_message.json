@@ -1,0 +1,23 @@
+{
+  "time": 1700000000,
+  "self_id": 123456,
+  "post_type": "message",
+  "message_type": "private",
+  "sub_type": "friend",
+  "message_id": 1,
+  "user_id": 111,
+  "message": [
+    {
+      "type": "text",
+      "data": {
+        "text": "你好"
+      }
+    }
+  ],
+  "raw_message": "你好",
+  "font": 0,
+  "sender": {
+    "user_id": 111,
+    "nickname": "小明"
+  }
+}
