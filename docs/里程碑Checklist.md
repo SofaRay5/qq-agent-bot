@@ -1,19 +1,19 @@
 # QQ机器人工程化项目 — 里程碑实施 Checklist
 
 **技术栈**：LangChain (1.0) + OneBot v11 (NapCat) + Python
-**使用方式**：跟着 Claude Code 一起实现，但标注 🧠 的部分必须你自己先动手设计/编写
+**使用方式**：跟着 Codex 一起实现，但标注 🧠 的部分必须你自己先动手设计/编写
 
 ---
 
 ## 图例
 
 - 🧠 **你必须自己做** — 设计决策、核心逻辑，不能外包给 AI
-- 🤖 **Claude Code 可以帮你** — 样板代码、排查、补全
+- 🤖 **Codex 可以帮你** — 样板代码、排查、补全
 - 📐 **工程实践点** — 这一步在练什么能力
 
 ## 协作总则（贯穿全程，先读一遍）
 
-- [ ] 每次用 Claude Code 前，先自己写伪代码/设计草图，带着"我想要什么结构"去对话
+- [ ] 每次用 Codex 前，先自己写伪代码/设计草图，带着"我想要什么结构"去对话
 - [ ] AI 生成代码后，逐行读一遍，能讲出每一行作用再接受
 - [ ] 优先让 AI 做 review（"这里有没有更好写法"），少让它直接代写核心逻辑
 - [ ] 每个里程碑完成后，在 `docs/journal/` 写一段复盘笔记：我设计了什么、踩了什么坑、AI帮了什么忙
@@ -24,30 +24,30 @@
 
 ### 🧠 你必须自己做
 
-- [ ] 写第一篇 ADR：`docs/decisions/ADR-001-dependency-tool.md`，记录依赖管理工具选型的理由（uv / poetry / pip 的权衡）
-- [ ] 手动搭建目录骨架：
+- [x] 写第一篇 ADR：`docs/decisions/ADR-001-dependency-tool.md`，记录依赖管理工具选型的理由（uv / poetry / pip 的权衡）
+- [x] 手动搭建目录骨架：
   ```bash
   mkdir -p qq-langchain-bot/{onebot_adapter,core,agent/tools,agent/middleware,memory,config,tests,scripts,data,docs/decisions,docs/journal}
   cd qq-langchain-bot && git init
   ```
-- [ ] 手写 `.gitignore`（至少覆盖：`data/`、`.env`、`__pycache__/`、`*.db`、`.venv/`），自己想清楚每一行为什么在那
-- [ ] 手写 `docs/CODING_STANDARDS.md`，至少包含：
-  - [ ] 类型标注 + docstring 规范
-  - [ ] 异常处理规范（禁止裸 `except:`）
-  - [ ] 日志 vs print 的规范
-  - [ ] 模块公共接口导出规范
+- [x] 手写 `.gitignore`（至少覆盖：`data/`、`.env`、`__pycache__/`、`*.db`、`.venv/`），自己想清楚每一行为什么在那
+- [x] 手写 `docs/CODING_STANDARDS.md`，至少包含：
+  - [x] 类型标注 + docstring 规范
+  - [x] 异常处理规范（禁止裸 `except:`）
+  - [x] 日志 vs print 的规范
+  - [x] 模块公共接口导出规范
 
-### 🤖 Claude Code 可以帮你
+### 🤖 Codex 可以帮你
 
-- [ ] 生成 `pyproject.toml` 骨架（你提供项目名/Python版本/依赖管理工具）
-- [ ] 生成 pre-commit 配置（ruff + mypy + pytest 钩子）
-- [ ] 检查 `.gitignore` 是否有遗漏
+- [x] 生成 `pyproject.toml` 骨架（你提供项目名/Python版本/依赖管理工具）
+- [x] 生成 pre-commit 配置（ruff + mypy + pytest 钩子）
+- [x] 检查 `.gitignore` 是否有遗漏
 
 ### ✅ 验收标准
 
-- [ ] `git log` 有至少一次规范 commit（如 `feat:` / `chore:` 前缀）
-- [ ] `docs/decisions/ADR-001-*.md` 是你自己写的
-- [ ] `pre-commit run --all-files` 能跑通
+- [x] `git log` 有至少一次规范 commit（如 `feat:` / `chore:` 前缀）
+- [x] `docs/decisions/ADR-001-*.md` 是你自己写的
+- [x] `pre-commit run --all-files` 能跑通
 - [ ] 能脱稿讲清楚为什么选这个依赖管理工具
 
 ### 📐 工程实践点
@@ -59,24 +59,24 @@
 
 ### 🧠 你必须自己做
 
-- [ ] 通读 [OneBot v11 官方文档](https://github.com/botuniverse/onebot-11) 的事件部分
-- [ ] 纸上画一张事件类型层级图（`post_type` → `sub_type` 的分类关系）
-- [ ] 手写 `onebot_adapter/event.py` 第一版模型骨架（哪怕写得丑）
-- [ ] 自己设计"条件必填"逻辑：`message_type="group"` 时 `group_id` 必填、`private` 时为 `None`，用 Pydantic `model_validator` 实现
-- [ ] 自己决定：`message` 字段用数组格式还是兼容 CQ 码字符串格式（并写下理由）
+- [x] 通读 [OneBot v11 官方文档](https://github.com/botuniverse/onebot-11) 的事件部分
+- [x] 纸上画一张事件类型层级图（`post_type` → `sub_type` 的分类关系）
+- [x] 手写 `onebot_adapter/event.py` 第一版模型骨架（哪怕写得丑）
+- [x] 自己设计"条件必填"逻辑：`message_type="group"` 时 `group_id` 必填、`private` 时为 `None`，用 Pydantic `model_validator` 实现
+- [x] 自己决定：`message` 字段用数组格式还是兼容 CQ 码字符串格式（并写下理由）
 
-### 🤖 Claude Code 可以帮你
+### 🤖 Codex 可以帮你
 
-- [ ] Review 你写的模型，检查有没有漏掉协议文档里的字段
-- [ ] 补全单元测试骨架（你再检查是否真的覆盖了关心的场景）
-- [ ] 生成从示例 JSON 转 test fixture 的脚本
+- [x] Review 你写的模型，检查有没有漏掉协议文档里的字段
+- [x] 补全单元测试骨架（你再检查是否真的覆盖了关心的场景）
+- [x] 生成从示例 JSON 转 test fixture 的脚本
 
 ### ✅ 验收标准
 
-- [ ] 能用你的 Pydantic 模型成功解析：群消息、私聊消息、心跳事件三种示例 JSON
-- [ ] 故意构造缺字段的错误 JSON，模型正确抛出验证错误（不是静默出错）
-- [ ] 单元测试覆盖：群消息解析 / 私聊消息解析 / 未知 post_type 容错
-- [ ] 能脱稿讲清楚 `message_type` 和 `sub_type` 的区别
+- [x] 能用你的 Pydantic 模型成功解析：群消息、私聊消息、心跳事件三种示例 JSON
+- [x] 故意构造缺字段的错误 JSON，模型正确抛出验证错误（不是静默出错）
+- [x] 单元测试覆盖：群消息解析 / 私聊消息解析 / 未知 post_type 容错
+- [x] 能脱稿讲清楚 `message_type` 和 `sub_type` 的区别
 
 ### 📐 工程实践点
 面对外部协议时的防御性数据层设计——外部输入永远不可信。
@@ -94,7 +94,7 @@
 - [ ] 自己设计 `call_action` 的 echo 匹配 + 超时逻辑
 - [ ] 自己想清楚：WS 断开时，正在等待的 Future 该如何处理（不能永远 pending）
 
-### 🤖 Claude Code 可以帮你
+### 🤖 Codex 可以帮你
 
 - [ ] Review 你的状态机，帮你找漏掉的边界情况（用提问方式，而非直接代写）
 - [ ] 写心跳超时检测的样板代码
@@ -120,7 +120,7 @@
 - [ ] 自己实现消息去重（幂等性）：选数据结构（如 LRU），想清楚为什么不用无限增长的 set
 - [ ] 自己写 `MessageSender` 分段发送逻辑，自己决定切割策略（按字节 vs 字符），处理中英文混排不切断词的问题
 
-### 🤖 Claude Code 可以帮你
+### 🤖 Codex 可以帮你
 
 - [ ] 写集成测试：起假 WS server 模拟 NapCat，验证 echo 全链路
 - [ ] 检查分段逻辑在极端输入（纯 emoji、无空格长字符串）下是否出错
@@ -146,7 +146,7 @@
 - [ ] 自己权衡并写下：日志里要不要打印用户消息原文（隐私考量）
 - [ ] 手写启动时的配置校验函数（程序启动即检查配置完整性）
 
-### 🤖 Claude Code 可以帮你
+### 🤖 Codex 可以帮你
 
 - [ ] 生成 `logging_config.py` 样板（JSON格式化、按天滚动）
 - [ ] 检查代码里是否还有残留硬编码值
@@ -170,7 +170,7 @@
 - [ ] 自己撰写 system prompt 初版内容（机器人性格设定是产品决策，不外包给AI）
 - [ ] 自己设计 LLM 调用失败（超时/限流/内容拦截）时的用户侧反馈策略
 
-### 🤖 Claude Code 可以帮你
+### 🤖 Codex 可以帮你
 
 - [ ] 排查 LangChain API 用法问题（版本迭代快，文档可能滞后）
 - [ ] 生成 Agent 调用的重试装饰器样板
@@ -193,7 +193,7 @@
 - [ ] 自己设计并实现 `make_thread_id` 函数，想清楚记忆隔离粒度规则（群聊按 群+用户，私聊按 用户）
 - [ ] 自己构造测试场景验证隔离性：同一用户在群A/群B是否互不干扰、私聊和群聊呢
 
-### 🤖 Claude Code 可以帮你
+### 🤖 Codex 可以帮你
 
 - [ ] 排查 SQLite checkpointer 具体 API 用法
 
@@ -220,7 +220,7 @@
 - [ ] 自己写 SQL 建表脚本 + 迁移逻辑（哪怕只有一版，也养成"schema变更要有迁移脚本"的习惯）
 - [ ] 自己实现存取接口，处理并发写入问题：加锁还是用事务？自己决定
 
-### 🤖 Claude Code 可以帮你
+### 🤖 Codex 可以帮你
 
 - [ ] Review 你的 schema 设计，指出潜在问题（缺索引、字段类型不合理等）
 - [ ] 写数据库操作单元测试骨架
@@ -245,7 +245,7 @@
   - [ ] 进程被杀死时任务跑到一半的数据丢失风险，你能否接受，为什么
 - [ ] 自己设计异常隔离：后台任务失败绝不能影响主流程，但也不能悄无声息失败——设计失败如何被记录和监控
 
-### 🤖 Claude Code 可以帮你
+### 🤖 Codex 可以帮你
 
 - [ ] 帮你写/迭代 LLM 结构化信息抽取的 prompt
 
@@ -267,7 +267,7 @@
 - [ ] 自己设计限流中间件策略：按用户还是按会话限流？固定窗口还是滑动窗口？权衡实现复杂度和准确性
 - [ ] 自己完整实现至少一个工具（含错误处理、返回给 LLM 时的格式设计）
 
-### 🤖 Claude Code 可以帮你
+### 🤖 Codex 可以帮你
 
 - [ ] 接入第三方 API 的样板代码（查文档、处理认证）
 
@@ -288,7 +288,7 @@
 - [ ] 自己审视整个项目，判断哪些地方测试覆盖不够（不要让 AI 决定"够不够"，自己想清楚核心风险点）
 - [ ] 自己写 CI（如 GitHub Actions）配置的核心逻辑，理解每一步为什么存在
 
-### 🤖 Claude Code 可以帮你
+### 🤖 Codex 可以帮你
 
 - [ ] 生成测试骨架、补充边界用例建议
 - [ ] 生成 CI yaml 样板
@@ -311,7 +311,7 @@
 - [ ] 自己写 `Dockerfile`（多阶段构建，理解为什么分构建阶段和运行阶段）
 - [ ] 自己完整走一遍部署流程，记录每个坑，写成 `docs/DEPLOYMENT.md`（自己写，不是AI生成）
 
-### 🤖 Claude Code 可以帮你
+### 🤖 Codex 可以帮你
 
 - [ ] 排查 Docker 构建报错
 - [ ] 优化镜像体积的建议
@@ -330,8 +330,8 @@
 
 | 里程碑 | 内容 | 状态 |
 |---|---|---|
-| 0 | 项目初始化 | ☐ |
-| 1 | OneBot 协议数据模型 | ☐ |
+| 0 | 项目初始化 | ✅ |
+| 1 | OneBot 协议数据模型 | ✅ |
 | 2 | OneBot WebSocket 客户端 | ☐ |
 | 3 | 最小闭环 Echo 机器人 | ☐ |
 | 4 | 配置系统与日志规范 | ☐ |
