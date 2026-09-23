@@ -4,17 +4,11 @@
 
 ## 当前状态
 
-- [x] 项目初始化：`uv`、类型检查、格式化与测试配置已建立。
-- [x] OneBot 事件模型：`onebot_adapter/event.py` 可解析群消息、私聊消息和心跳事件；对应单元测试已存在。
-- [x] WebSocket 基础收发：`onebot_adapter/client.py` 已能接收事件并按 `echo` 匹配 action 结果；本地假服务测试已通过。
-- [x] WebSocket 失败路径与发送封装：action 超时、断线、失败响应和私聊/群聊发送已通过本地假服务测试。
-- [x] 消息路由：私聊文本、群聊 @、去重与失败回退已通过单元测试。
-- [x] echo 入口与本地假 NapCat 闭环：私聊和群聊 @ 可触发对应 OneBot action；真实 NapCat 尚未验收。
-- [ ] 可运行的 QQ 机器人：真实 NapCat echo 验收与 LLM 接入尚未完成。
+NapCat echo 闭环已完成真实 QQ 验收；单轮 LLM 回复尚未接入。具体 Task/Step 勾选以 [实施计划](superpowers/plans/2026-09-23-qq-bot-mvp.md)为准。
 
 ## 1. 环境可复现
 
-- [x] `uv sync` 成功；`uv run pytest` 和 `uv run pre-commit run --all-files` 通过（本地环境，34 tests）。
+- [x] `uv sync` 成功；`uv run pytest` 和 `uv run pre-commit run --all-files` 通过。
 - [ ] 明确 NapCat 地址、访问令牌及 LLM 提供方的配置方式；密钥只存本地环境变量或未跟踪的 `.env`，不提交到 Git。
 
 完成标准：新环境照文档安装依赖后，能运行现有测试；缺少必填配置时启动错误清楚。
@@ -23,11 +17,11 @@
 
 - [x] 实现正向 WebSocket 连接、事件接收和 OneBot action 发送；复用现有事件模型（本地假服务验证）。
 - [x] 实现连接恢复、action 的 `echo` 匹配和超时；断线时等待中的请求不能无限挂起（本地假服务验证）。
-- [ ] 路由私聊消息和群内 @ 消息，跳过机器人自身消息；本地假服务已验证，待真实 NapCat echo 验收。
+- [x] 路由私聊消息和群内 @ 消息，跳过机器人自身消息；用户已确认真实 QQ echo 回复。
 
 完成标准：真实 NapCat 上可收发消息；重启 NapCat 后自动恢复；假 WebSocket 测试覆盖请求响应和断线场景。
 
-真实 NapCat 验收待办：配置本地 `NAPCAT_WS_URL` 与 `NAPCAT_ACCESS_TOKEN` 后，分别发送私聊文本和群内 @ 文本，确认 echo 回复；重启 NapCat，再确认一条消息可收到回复。当前环境未提供这两个变量，尚无真实服务验收记录。
+真实 NapCat 验收记录（2026-09-23，用户手动验证）：私聊纯文本、群内 @ 纯文本均收到原文回复；重启 NapCat 后再次发送消息，确认机器人自动恢复回复。令牌未记录在仓库。
 
 ## 3. LLM 回复 MVP
 

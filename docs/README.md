@@ -1,29 +1,13 @@
-# 文档目录
+# 文档索引
 
-当前进度：echo 机器人入口已可运行，本地假 NapCat 测试覆盖私聊和群聊 @ 收发；真实 NapCat 尚未验收，LLM 回复尚未接入。
-按实施计划一次推进一个任务，每个任务结束后等待用户明确启动下一任务；不自动提交 Git。
-
-## 运行 echo 机器人
-
-在 NapCat 启用 OneBot v11 **正向 WebSocket** 服务，将 `messagePostFormat` 设为 `array`，设置访问令牌，并使用服务根路径 `/`（例如 `ws://127.0.0.1:3001/`）。令牌与下面的环境变量值保持一致；不要把令牌写入仓库或命令日志。
-
-```bash
-uv sync
-export NAPCAT_WS_URL='ws://127.0.0.1:3001/'
-export NAPCAT_ACCESS_TOKEN='你的 NapCat 访问令牌'
-uv run python main.py
-```
-
-在 QQ 私聊机器人发送文本，或在群里 @ 机器人后发送文本，应收到原文回复。重启 NapCat 后再发送一条消息，用于确认自动重连。退出时按 Ctrl+C。当前仅处理数组格式的文本消息；其他消息段暂不作为回复内容。
+安装和运行方式见仓库根目录的 [README](../README.md)。这里按用途列出其余文档。
 
 ## 规划与架构
 
-- [QQ机器人工程化设计文档.md](QQ机器人工程化设计文档.md) — 完整目标架构设计（技术选型、
-  各层职责、代码结构、Docker 部署方案）。动手设计任何一层之前先看这个。
-- [里程碑Checklist.md](里程碑Checklist.md) — 按可运行成果推进的路线图和验收标准；
-  AI 可以实现核心代码，用户决定目标并验收。
+- [里程碑Checklist.md](里程碑Checklist.md) — 当前阶段和真实 QQ 验收记录。
 - [superpowers/specs/2026-09-23-qq-bot-mvp-design.md](superpowers/specs/2026-09-23-qq-bot-mvp-design.md) — 已批准的 echo 与单轮 LLM MVP 设计。
-- [superpowers/plans/2026-09-23-qq-bot-mvp.md](superpowers/plans/2026-09-23-qq-bot-mvp.md) — 已批准的逐任务实施计划与当前进度。
+- [superpowers/plans/2026-09-23-qq-bot-mvp.md](superpowers/plans/2026-09-23-qq-bot-mvp.md) — 逐任务实施计划和 Task/Step 勾选。
+- [QQ机器人工程化设计文档.md](QQ机器人工程化设计文档.md) — 长期目标架构的参考选项；MVP 不要求一次实现全部内容。
 
 ## 工程规范与流程
 
