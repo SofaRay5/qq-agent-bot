@@ -1,9 +1,8 @@
 # OneBot v11 事件参考（原文整理）
 
 > 来源：[botuniverse/onebot-11](https://github.com/botuniverse/onebot-11) 官方文档（`event/` 目录），
-> 抓取时间 2026-08-17。这是资料整理/离线查阅用，不替代通读官方文档、也不替代自己理解——
-> milestone 1 的验收标准要求"能脱稿讲清楚 `message_type` 和 `sub_type` 的区别"，这个只能靠
-> 自己读懂，不能靠背这份摘要。
+> 抓取时间 2026-08-17。这是资料整理/离线查阅用；具体实现仍应核对当前 OneBot 协议与
+> NapCat 的实际行为。
 
 ## 事件总览
 

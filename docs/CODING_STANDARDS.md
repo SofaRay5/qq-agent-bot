@@ -52,7 +52,7 @@ def make_thread_id(message_type: str, user_id: str, group_id: str | None) -> str
   两个场景：
   1. `agent/tools/` 里的工具函数——设计文档要求工具异常必须被捕获、转成友好文本返回给 LLM，
      而不是抛出去打断整个 Agent 循环。
-  2. 后台异步任务（比如 milestone 8 的记忆提取 `asyncio.create_task`）——后台任务失败绝不能
+  2. 后台异步任务（比如未来的记忆提取 `asyncio.create_task`）——后台任务失败绝不能
      影响主对话流程，但必须记录日志，不能默默吞掉。
 
   除了这两类场景，其他地方应该捕获具体的异常类型（如 `ValueError`、`TimeoutError`、
@@ -69,14 +69,14 @@ def make_thread_id(message_type: str, user_id: str, group_id: str | None) -> str
 - **`onebot_adapter/`、`core/`、`agent/`、`memory/` 这些长期运行的服务代码一律用 `logging`**，
   不用 `print`。原因：`print` 没有级别、没有时间戳、生产环境里没法按级别过滤或者结构化收集。
 
-- 日志级别的基本原则（milestone 4 会细化成 `logging_config.py`）：
+- 日志级别的基本原则（接入持久化日志时再细化配置）：
   - `DEBUG`：排查问题时才需要的细节（原始收发的 JSON、中间状态）
   - `INFO`：正常的关键节点（连接建立、消息处理完成、记忆写入成功）
   - `WARNING`：不影响主流程但值得注意（重试、降级、跳过了某条消息）
   - `ERROR`：某个操作失败了，需要人关注（工具调用异常、数据库写入失败、LLM 调用超时）
 
 - **用户消息原文默认不打进日志**（隐私考虑），确需记录用于排查时，只在 `DEBUG` 级别记录，且
-  之后要考虑脱敏方案（milestone 4 再具体定）。
+  同时应考虑脱敏，避免意外记录隐私信息。
 
 ## 模块公共接口导出
 
@@ -87,7 +87,8 @@ def make_thread_id(message_type: str, user_id: str, group_id: str | None) -> str
 
 - **跨层调用有严格边界，这是本项目最重要的一条模块规范：**
   - `agent/` 禁止 import 任何 `onebot_adapter/` 的东西——agent 层完全不知道 OneBot 协议的
-    存在，所有协议细节必须先经过 `onebot_adapter/message.py` 转换成 `UnifiedMessage`。
+    存在。当前 MVP 由 `onebot_adapter/message.py` 提取文本，`core/` 只把纯文本交给 agent；
+    将来确需处理多种消息段时，再考虑 `UnifiedMessage`。
   - `onebot_adapter/` 禁止 import 任何 `agent/` 或业务逻辑相关的东西——它只做协议翻译，不该
     知道"消息会被拿去问 LLM"这件事。
   - `core/` 是唯一允许同时依赖 `onebot_adapter/` 和 `agent/` 的层，它的职责就是把两边粘起来。
