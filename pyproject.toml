@@ -1,9 +1,10 @@
 [project]
 name = "qq-agent-bot"
 version = "0.1.0"
-description = "工程化 QQ 智能机器人：OneBot v11 + LangChain/LangGraph"
+description = "工程化 QQ 智能机器人：OneBot v11 + LangChain"
 requires-python = ">=3.13"
 dependencies = [
+    "langchain-openai>=1.6.5",
     "pydantic>=2.13.4",
     "websockets>=17.1",
 ]

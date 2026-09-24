@@ -13,4 +13,13 @@ if [[ -z "$NAPCAT_ACCESS_TOKEN" ]]; then
 fi
 export NAPCAT_ACCESS_TOKEN
 
+printf '请输入 DeepSeek API Key：'
+IFS= read -r -s DEEPSEEK_API_KEY
+printf '\n'
+if [[ -z "$DEEPSEEK_API_KEY" ]]; then
+    printf 'API Key 不能为空\n' >&2
+    exit 1
+fi
+export DEEPSEEK_API_KEY
+
 exec uv run python main.py

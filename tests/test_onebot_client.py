@@ -1,9 +1,10 @@
 import asyncio
 import json
 from time import monotonic
-from typing import Any
+from typing import Any, cast
 
 import pytest
+from websockets.asyncio.client import ClientConnection
 from websockets.asyncio.server import ServerConnection, serve
 
 from onebot_adapter import client as client_module
@@ -81,6 +82,27 @@ async def test_action_times_out_without_a_response(
         finally:
             runner.cancel()
             await asyncio.gather(runner, return_exceptions=True)
+
+
+async def test_action_timeout_includes_blocked_send(monkeypatch: pytest.MonkeyPatch) -> None:
+    class BlockingSocket:
+        async def send(self, _payload: str) -> None:
+            await asyncio.Event().wait()
+
+    monkeypatch.setattr(client_module, "ACTION_TIMEOUT_SECONDS", 0.02, raising=False)
+    client = OneBotClient("ws://127.0.0.1:3001/", "test-token")
+    client._ws = cast(ClientConnection, BlockingSocket())
+
+    action = asyncio.create_task(client.call_action("get_status", {}))
+    try:
+        await asyncio.sleep(0.1)
+        assert action.done()
+        with pytest.raises(TimeoutError):
+            action.result()
+        assert not client._pending
+    finally:
+        action.cancel()
+        await asyncio.gather(action, return_exceptions=True)
 
 
 async def test_disconnect_fails_a_pending_action(heartbeat_json: dict[str, Any]) -> None:

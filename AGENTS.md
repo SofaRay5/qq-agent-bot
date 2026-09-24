@@ -6,7 +6,7 @@ Build a usable QQ bot with OneBot v11 (NapCat) and an LLM. This is now an AI-ass
 
 ## Current State and Roadmap
 
-`onebot_adapter/event.py` parses private/group messages and heartbeats with an `UnknownEvent` fallback. The WebSocket client, text routing, and `main.py` echo entry point pass local fake NapCat tests; real QQ/NapCat acceptance is pending. LLM integration is not implemented. Follow [docs/里程碑Checklist.md](docs/里程碑Checklist.md): environment, NapCat echo loop, LLM reply MVP, then optional enhancements. The old hand-coding checklist is archived at [docs/archive/里程碑Checklist-学习版.md](docs/archive/里程碑Checklist-学习版.md) for historical reference only.
+`onebot_adapter/event.py` parses private/group messages and heartbeats with an `UnknownEvent` fallback. The WebSocket client and text routing pass local fake NapCat tests; the echo entry point passed real QQ/NapCat acceptance. `main.py` now connects a single-turn DeepSeek reply, tested with local fakes; real API acceptance is pending. Follow [docs/里程碑Checklist.md](docs/里程碑Checklist.md): environment, NapCat echo loop, LLM reply MVP, then optional enhancements. The old hand-coding checklist is archived at [docs/archive/里程碑Checklist-学习版.md](docs/archive/里程碑Checklist-学习版.md) for historical reference only.
 
 ## Architecture
 
@@ -26,7 +26,7 @@ Python >=3.13; use `uv` and the committed `uv.lock`.
 uv sync
 uv run pytest
 uv run pre-commit run --all-files
-uv run python main.py  # requires NAPCAT_WS_URL and NAPCAT_ACCESS_TOKEN
+uv run python main.py  # requires NAPCAT_WS_URL, NAPCAT_ACCESS_TOKEN, DEEPSEEK_API_KEY
 ```
 
 Follow [docs/CODING_STANDARDS.md](docs/CODING_STANDARDS.md). Test behavior at protocol boundaries and failure paths; keep credentials out of Git and logs. Update the roadmap and entry-point instructions when functionality changes. Do not mark real NapCat or LLM acceptance checks complete without exercising those services.

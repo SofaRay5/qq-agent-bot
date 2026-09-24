@@ -86,13 +86,19 @@ class OneBotClient:
         echo = uuid4().hex
         future: asyncio.Future[dict[str, object]] = asyncio.get_running_loop().create_future()
         self._pending[echo] = future
-        try:
+
+        async def send_and_wait() -> dict[str, object]:
             await ws.send(json.dumps({"action": action, "params": params, "echo": echo}))
-            result = await asyncio.wait_for(future, timeout=ACTION_TIMEOUT_SECONDS)
+            return await future
+
+        try:
+            result = await asyncio.wait_for(send_and_wait(), timeout=ACTION_TIMEOUT_SECONDS)
         except ConnectionClosed as exc:
             raise ConnectionError("NapCat disconnected") from exc
         finally:
             self._pending.pop(echo, None)
+            if not future.done():
+                future.cancel()
             if future.done() and not future.cancelled():
                 future.exception()
         if result.get("status") != "ok" or result.get("retcode") != 0:

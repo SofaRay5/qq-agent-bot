@@ -11,6 +11,7 @@
 
 ## 工程规范与流程
 
+- [Task6测试指南.md](Task6测试指南.md) — 使用启动窗口完成自动化、私聊、群聊和停止验收。
 - [CODING_STANDARDS.md](CODING_STANDARDS.md) — 编码规范：类型标注/docstring、异常处理、
   日志 vs print、模块跨层调用边界。
 - [DEV_WORKFLOW.md](DEV_WORKFLOW.md) — 日常开发流程速查：commit/push 步骤、commit

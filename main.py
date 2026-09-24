@@ -1,11 +1,12 @@
-"""Run the NapCat echo bot."""
+"""Run the NapCat LLM bot."""
 
 import asyncio
 import logging
 import os
 from urllib.parse import urlsplit
 
-from core.dispatcher import Dispatcher, echo_reply
+from agent.reply import LLMReply
+from core.dispatcher import Dispatcher
 from onebot_adapter.client import OneBotClient
 
 
@@ -17,9 +18,10 @@ def _required(name: str) -> str:
 
 
 async def run() -> None:
-    """Validate NapCat settings, then run the echo bot until stopped."""
+    """Validate settings, then run the LLM bot until stopped."""
     ws_url = _required("NAPCAT_WS_URL")
     token = _required("NAPCAT_ACCESS_TOKEN")
+    api_key = _required("DEEPSEEK_API_KEY")
     parts = urlsplit(ws_url)
     if (
         parts.scheme not in {"ws", "wss"}
@@ -31,7 +33,7 @@ async def run() -> None:
         raise ValueError("NAPCAT_WS_URL must point to a root ws:// or wss:// endpoint")
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     client = OneBotClient(ws_url, token)
-    dispatcher = Dispatcher(client, echo_reply)
+    dispatcher = Dispatcher(client, LLMReply(api_key))
     try:
         await client.run(dispatcher.handle_event)
     finally:
@@ -39,7 +41,7 @@ async def run() -> None:
 
 
 def main() -> None:
-    """Start the echo bot from the command line."""
+    """Start the LLM bot from the command line."""
     asyncio.run(run())
 
 

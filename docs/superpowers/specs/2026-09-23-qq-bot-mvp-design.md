@@ -6,7 +6,7 @@
 
 在现有 Python 项目中完成 OneBot v11（NapCat）正向 WebSocket 到 QQ 回复的闭环，先以 echo 验收，再接入一个 LLM。项目应让 AI 能按清晰的模块边界持续开发，但只增加这条链路需要的代码、配置、日志、测试和运行说明。
 
-第一阶段交付可运行的 echo 机器人；第二阶段使用 OpenAI GPT-6 Luna 生成单轮文本回复。两阶段分别验收，真实 NapCat 和真实 LLM 检查只有实际执行后才能标记完成。记忆、工具、数据库、Web 服务、部署及 CI 留待出现具体需求。
+第一阶段交付可运行的 echo 机器人；第二阶段使用 DeepSeek Flash 生成单轮文本回复。两阶段分别验收，真实 NapCat 和真实 LLM 检查只有实际执行后才能标记完成。记忆、工具、数据库、Web 服务、部署及 CI 留待出现具体需求。
 
 现状：`onebot_adapter/event.py` 已解析私聊、群聊和心跳事件，并对未知事件返回 `UnknownEvent`；`main.py` 仍是占位。现有工作区有未提交文档修改，实施时必须保留。
 
@@ -15,9 +15,9 @@
 - 沿用 Python >=3.13、`uv` 和现有 Pydantic 事件模型。
 - 使用 NapCat 的 OneBot v11 正向 WebSocket 服务端；机器人主动连接其 `/` 路径，在同一连接上接收事件和发送 action。NapCat 将 `messagePostFormat` 配为 `array`，启用 token。
 - 使用 `websockets` 的 asyncio 客户端及其内置重连退避，避免自写重连状态机。
-- LLM 阶段使用 LangChain `create_agent` 和 OpenAI 集成包；`create_agent` 使用 LangGraph 运行时，但本 MVP 不配置工具或 checkpointer。模型为 `gpt-6-luna`。
+- LLM 阶段使用 `langchain-openai` 的 `ChatOpenAI` 连接 DeepSeek 的 OpenAI 兼容接口，不引入额外 provider 层。模型固定为 `deepseek-flash`，地址固定为 `https://api.deepseek.com`；关闭默认思考模式，以降低日常聊天的延迟和 token 成本。
 
-这些选择以 [OneBot v11 正向 WebSocket 规范](https://github.com/botuniverse/onebot-11/blob/master/communication/ws.md)、[NapCat 配置定义](https://github.com/NapNeko/NapCatQQ/blob/main/packages/napcat-onebot/config/config.ts)、[websockets asyncio 客户端文档](https://websockets.readthedocs.io/en/latest/reference/asyncio/client.html)、[LangChain agent 文档](https://docs.langchain.com/oss/python/langchain/agents) 和 [OpenAI 聊天模型集成文档](https://docs.langchain.com/oss/python/integrations/chat/openai) 为准。具体依赖版本由实施计划结合 `uv.lock` 决定。
+这些选择以 [OneBot v11 正向 WebSocket 规范](https://github.com/botuniverse/onebot-11/blob/master/communication/ws.md)、[NapCat 配置定义](https://github.com/NapNeko/NapCatQQ/blob/main/packages/napcat-onebot/config/config.ts)、[websockets asyncio 客户端文档](https://websockets.readthedocs.io/en/latest/reference/asyncio/client.html)和 [DeepSeek API 文档](https://api-docs.deepseek.com/quick_start/pricing/)为准。具体依赖版本由实施计划结合 `uv.lock` 决定。
 
 ## 组件与边界
 
@@ -26,14 +26,14 @@
 | `onebot_adapter/event.py` | 保留现有事件模型和 `parse_event()` | 不引入 LLM 逻辑 |
 | `onebot_adapter/client.py` | 建立连接、接收 JSON、区分事件与 action 结果、匹配 `echo`、发送私聊或群聊消息、处理超时和断线 | 只理解 OneBot 协议 |
 | `core/dispatcher.py` | 过滤消息、提取文本、去重、调度回复任务并选择发送目标 | 使用 adapter，调用一个接收文本并返回文本的回复函数 |
-| `agent/` | 在第二阶段封装一次异步 `create_agent` 调用，把用户文本转为回复文本 | 不导入 OneBot 类型 |
+| `agent/` | 在第二阶段封装一次异步 DeepSeek 模型调用，把用户文本转为回复文本 | 不导入 OneBot 类型 |
 | `main.py` | 读取环境变量、验证启动配置、组装并运行上述组件 | 唯一的程序入口 |
 
 不为单一实现新增工厂、通用 provider 接口或中间件管线。Echo 阶段的回复函数直接返回输入文本；LLM 阶段将同一调用点接到 `agent/`。
 
 ## 消息流程与行为
 
-1. 启动时读取 `NAPCAT_WS_URL`（指向 `/` 路径）、`NAPCAT_ACCESS_TOKEN`；缺项或空值直接报出配置项名称并退出。token 通过 `Authorization: Bearer` 连接鉴权头传递，日志不输出 token 或完整鉴权头。第二阶段启动还要求 `OPENAI_API_KEY`。凭据仅从环境变量读取，不提交 `.env`。
+1. 启动时读取 `NAPCAT_WS_URL`（指向 `/` 路径）、`NAPCAT_ACCESS_TOKEN`；缺项或空值直接报出配置项名称并退出。token 通过 `Authorization: Bearer` 连接鉴权头传递，日志不输出 token 或完整鉴权头。第二阶段启动还要求 `DEEPSEEK_API_KEY`。凭据仅从环境变量读取，不提交 `.env`。
 2. 客户端连接 NapCat 的 `/` WebSocket 路径。接收循环先解码 JSON：带 `echo` 的 action 结果交给对应等待者；其他对象交给现有 `parse_event()`。心跳仅用于连接可见性，未知事件忽略，格式错误的帧或已知事件只记录无正文的错误并继续读取。
 3. `core` 跳过 `user_id == self_id` 的消息。私聊只处理含文本的消息；群聊只处理包含 `at` 段且其 `qq` 指向 `self_id` 的消息。群聊从该 @ 段之后提取文本，去掉 @ 段；纯空白文本不回复。图片、表情和其他非文本段不进入回复函数。
 4. Echo 阶段回显提取出的文本。LLM 阶段以该文本作为一次独立输入，返回纯文本；没有跨消息记忆、工具调用或用户画像。私聊调用 `send_private_msg`，群聊调用 `send_group_msg`。
@@ -56,10 +56,10 @@
 
 ### 阶段 B：LLM 回复
 
-- 加入 LangChain/OpenAI 所需依赖和最小 `agent/` 调用，替换 echo 回复函数；启动时检查 API key。
+- 加入 `langchain-openai` 和最小 DeepSeek `agent/` 调用，替换 echo 回复函数；启动时检查 API key。
 - 用假的回复函数或模型调用验证正常回复、超时与失败提示，不让测试调用付费 API；保留假 WebSocket 的全链路自动化检查。
 - 更新运行说明和路线图，再执行相关检查。用真实 API 在 QQ 中验证回复，并确认一次失败后后续消息仍能处理；若缺少凭据，将真实验收保持未完成。
 
 ## 已知限制
 
-MVP 仅处理文本；不提供长消息分段、持久去重、多轮记忆或消息重试。若实际 NapCat 或 OpenAI 行为与假服务不同，先依据真实服务反馈修正协议边界，再扩展功能。
+MVP 仅处理文本；不提供长消息分段、持久去重、多轮记忆或消息重试。若实际 NapCat 或 DeepSeek 行为与假服务不同，先依据真实服务反馈修正协议边界，再扩展功能。
