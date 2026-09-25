@@ -11,6 +11,7 @@
 - [superpowers/specs/2026-09-24-task8-groupmate-behavior-design.md](superpowers/specs/2026-09-24-task8-groupmate-behavior-design.md) — 已批准的 Task 8 群友行为、人格与费用专项设计。
 - [superpowers/plans/2026-09-23-qq-bot-mvp.md](superpowers/plans/2026-09-23-qq-bot-mvp.md) — 逐任务实施计划和 Task/Step 勾选。
 - [superpowers/plans/2026-09-24-task7-image-understanding.md](superpowers/plans/2026-09-24-task7-image-understanding.md) — 已批准并执行的 Task 7 识图实施计划。
+- [superpowers/plans/2026-09-24-task8-groupmate-behavior.md](superpowers/plans/2026-09-24-task8-groupmate-behavior.md) — 待用户审阅的 Task 8 群友行为实施计划。
 - [QQ机器人工程化设计文档.md](QQ机器人工程化设计文档.md) — 长期目标架构的参考选项；MVP 不要求一次实现全部内容。
 
 ## 工程规范与流程
