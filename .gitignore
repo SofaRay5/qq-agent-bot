@@ -7,3 +7,4 @@ data/
 *.log
 /config/settings.json
 /config/persona.json
+/config/private.json

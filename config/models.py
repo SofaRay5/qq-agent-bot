@@ -2,12 +2,102 @@
 
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
+
+
+class ProviderSettings(StrictModel):
+    provider: Literal["deepseek", "openai_compatible"] = "deepseek"
+    base_url: str = ""
+    model: str = ""
+    api_key: str = Field(default="", repr=False)
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, value: str) -> str:
+        if not value:
+            return value
+        try:
+            parts = urlsplit(value)
+            _ = parts.port
+        except ValueError:
+            raise ValueError("base_url must be a valid HTTPS URL") from None
+        if (
+            parts.scheme != "https"
+            or not parts.hostname
+            or parts.username
+            or parts.password
+            or parts.query
+            or parts.fragment
+        ):
+            raise ValueError("base_url must be a valid HTTPS URL")
+        return value
+
+
+class PrivateSettings(StrictModel):
+    napcat_ws_url: str = ""
+    napcat_access_token: str = Field(default="", repr=False)
+    chat: ProviderSettings = Field(
+        default_factory=lambda: ProviderSettings(
+            provider="deepseek",
+            base_url="https://api.deepseek.com",
+            model="deepseek-flash",
+        )
+    )
+    vision_enabled: bool = False
+    vision: ProviderSettings = Field(default_factory=ProviderSettings)
+
+    @field_validator("napcat_ws_url")
+    @classmethod
+    def validate_napcat_ws_url(cls, value: str) -> str:
+        if not value:
+            return value
+        try:
+            parts = urlsplit(value)
+            _ = parts.port
+        except ValueError:
+            raise ValueError("napcat_ws_url must be a valid WebSocket URL") from None
+        if (
+            parts.scheme not in {"ws", "wss"}
+            or not parts.hostname
+            or parts.path not in {"", "/"}
+            or parts.username
+            or parts.password
+            or parts.query
+            or parts.fragment
+        ):
+            raise ValueError("napcat_ws_url must be a valid root WebSocket URL")
+        return value
+
+    def validate_for_start(self) -> None:
+        missing = [
+            name
+            for name, value in (
+                ("napcat_ws_url", self.napcat_ws_url),
+                ("napcat_access_token", self.napcat_access_token),
+                ("chat.base_url", self.chat.base_url),
+                ("chat.model", self.chat.model),
+                ("chat.api_key", self.chat.api_key),
+            )
+            if not value.strip()
+        ]
+        if self.vision_enabled:
+            missing.extend(
+                name
+                for name, value in (
+                    ("vision.base_url", self.vision.base_url),
+                    ("vision.model", self.vision.model),
+                    ("vision.api_key", self.vision.api_key),
+                )
+                if not value.strip()
+            )
+        if missing:
+            raise ValueError(f"Missing private settings fields: {', '.join(missing)}")
 
 
 class Settings(StrictModel):
