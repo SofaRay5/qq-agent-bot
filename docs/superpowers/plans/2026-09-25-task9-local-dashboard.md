@@ -125,7 +125,7 @@ git commit -m "feat: add private dashboard configuration"
 - Consumes: Task 9.1 `ProviderSettings`; existing `DailyBudget`, `SessionState`, `GroupmateReply`, `VisionDescriber`.
 - Produces: `GroupmateRuntime` and `GroupmateCoordinator.replace_runtime(runtime: GroupmateRuntime) -> None`; constructors `GroupmateReply(persona, provider, budget)` and `VisionDescriber(provider, budget)`.
 
-- [ ] **Step 1: Write failing provider-construction tests.**
+- [x] **Step 1: Write failing provider-construction tests.**
 
 Patch `ChatOpenAI` and assert both reply classes pass the configured base URL, model and secret. Assert only the DeepSeek chat preset adds its current thinking setting; both chat providers retain JSON response format and zero retries.
 
@@ -133,17 +133,17 @@ Run: `uv run pytest tests/test_groupmate_reply.py tests/test_vision.py -q`
 
 Expected: FAIL because constructors still take separate fixed values.
 
-- [ ] **Step 2: Make provider settings drive both model clients.**
+- [x] **Step 2: Make provider settings drive both model clients.**
 
 Change the two constructors to consume `ProviderSettings`. Keep prompt construction, JSON protocol, image message format and budget behavior unchanged.
 
-- [ ] **Step 3: Run provider tests.**
+- [x] **Step 3: Run provider tests.**
 
 Run: `uv run pytest tests/test_groupmate_reply.py tests/test_vision.py -q`
 
 Expected: PASS.
 
-- [ ] **Step 4: Write failing runtime-swap tests.**
+- [x] **Step 4: Write failing runtime-swap tests.**
 
 Add a blocking old reply and a new reply. Start one message, call `replace_runtime`, release the old message, then send another message. Assert the first uses the old reply, the second uses the new reply, and the second receives the first message's retained history. Add the same boundary assertion for new settings/persona name.
 
@@ -151,7 +151,7 @@ Run: `uv run pytest tests/test_groupmate.py -q`
 
 Expected: FAIL because runtime replacement does not exist.
 
-- [ ] **Step 5: Introduce one immutable runtime bundle.**
+- [x] **Step 5: Introduce one immutable runtime bundle.**
 
 Add:
 
@@ -168,7 +168,7 @@ def replace_runtime(self, runtime: GroupmateRuntime) -> None: ...
 
 `handle()` captures `self._runtime` once before processing and passes that snapshot through helpers. Keep `_states` on the coordinator so swaps do not clear context. The authenticated NapCat image resolver remains connection-scoped and unchanged.
 
-- [ ] **Step 6: Verify and commit Task 9.2.**
+- [x] **Step 6: Verify and commit Task 9.2.**
 
 Run: `uv run pytest tests/test_groupmate.py tests/test_groupmate_reply.py tests/test_vision.py -q`
 
