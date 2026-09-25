@@ -89,6 +89,7 @@ async def test_builds_safe_persona_prompt_and_parses_reply(
             "base_url": "https://api.deepseek.com",
             "api_key": SecretStr("deepseek-secret-key"),
             "extra_body": {"thinking": {"type": "disabled"}},
+            "model_kwargs": {"response_format": {"type": "json_object"}},
             "max_retries": 0,
         }
     ]
@@ -101,6 +102,7 @@ async def test_builds_safe_persona_prompt_and_parses_reply(
     ]
     system = messages[0].content
     assert isinstance(system, str)
+    assert "JSON" in system
     assert system.index("安全规则") < system.index("独特角色描述")
     assert "direct" in system
     assert "deepseek-secret-key" not in system
