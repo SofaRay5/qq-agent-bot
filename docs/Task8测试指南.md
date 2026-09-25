@@ -30,10 +30,10 @@ uv run pre-commit run --all-files
 确认 NapCat 已启用 `127.0.0.1:3001` 的 WebSocket 服务端，消息格式为 `array`，然后执行：
 
 ```bash
-bash scripts/start_echo.sh
+bash scripts/start_bot.sh
 ```
 
-依次输入 NapCat WebSocket Token 和 DeepSeek API Key。输入不会回显。按 `Ctrl+C` 停止。
+在窗口中填写 WebSocket 地址、NapCat Token 和 DeepSeek API Key，保持“启用识图”未勾选，然后点击“启动”。密钥输入不会回显。点击“停止”或关闭窗口即可结束机器人。
 
 ## 4. 私聊与人格
 
@@ -77,7 +77,7 @@ bash scripts/start_echo.sh
 
 ## 8. Task 7 + Task 8 组合验收
 
-视觉服务可能收费。按 [Task 7 测试指南](Task7测试指南.md)设置 `VISION_ENABLED=1`、视觉地址、模型和密钥后启动：
+视觉服务可能收费。按 [Task 7 测试指南](Task7测试指南.md)在启动窗口勾选“启用识图”，填写视觉地址、模型和密钥后启动：
 
 1. 私聊发送图片并提问，回复应参考图片。
 2. 群内 @ 机器人并发送图片，应回复并开启持续窗口。

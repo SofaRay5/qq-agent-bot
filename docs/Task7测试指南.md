@@ -23,11 +23,13 @@ uv run pre-commit run --all-files
 
 ## 3. 验证默认关闭
 
-不要设置 `VISION_ENABLED`，按原方式启动：
+打开启动窗口：
 
 ```bash
-bash scripts/start_echo.sh
+bash scripts/start_bot.sh
 ```
+
+不要勾选“启用识图”。填写 WebSocket 地址、NapCat Token 和 DeepSeek API Key，点击“启动”。
 
 依次验证：
 
@@ -35,7 +37,7 @@ bash scripts/start_echo.sh
 2. 在群里不 @ 机器人发送图片，应不回复。
 3. 在群里 @ 机器人并发送图片，应回复“识图尚未开启”。
 4. 再发送普通文字，应继续得到 DeepSeek 回复。
-5. 按 `Ctrl+C` 停止机器人。
+5. 点击“停止”。
 
 这些步骤不会调用视觉 API，也不会占用每日次数。
 
@@ -44,16 +46,14 @@ bash scripts/start_echo.sh
 准备一个兼容 OpenAI 图片消息格式的视觉接口，并确认模型本身支持图片输入。不要把密钥写进文件或提交到 Git。
 
 ```bash
-export VISION_ENABLED=1
-export VISION_API_BASE_URL='https://你的视觉服务地址/v1'
-export VISION_MODEL='支持图片输入的模型名'
-read -r -s VISION_API_KEY
-printf '\n'
-export VISION_API_KEY
-bash scripts/start_echo.sh
+bash scripts/start_bot.sh
 ```
 
-启动脚本还会依次询问 NapCat WebSocket Token 和 DeepSeek API Key。三个密钥都不会回显。
+1. 填写 WebSocket 地址、NapCat Token 和 DeepSeek API Key。
+2. 勾选“启用识图”。
+3. “视觉 API 地址”填写 HTTPS 接口地址，例如 `https://服务地址/v1`。
+4. 填写支持图片输入的模型名和视觉 API Key。
+5. 点击“启动”。三个密钥输入框都会隐藏文字，并在启动后清空。
 
 ## 5. 验证真实识图
 
@@ -61,17 +61,17 @@ bash scripts/start_echo.sh
 2. 确认回复同时参考了文字和图片内容。
 3. 在群里 @ 机器人后发送一张图片，确认得到识图回复。
 4. 一条消息放两张图片时，只应使用第一张普通图片。
-5. 按 `Ctrl+C` 停止机器人。
+5. 点击“停止”。
 
 程序只从受限的 QQ 图片域名下载，拒绝跳转、私网地址、非图片内容和超过 8 MiB 的响应。真实 NapCat 若提供了未在允许列表中的图片域名，机器人会回复固定失败提示；记录该域名形态后再收窄地补充允许列表，不要直接放开任意网址。
 
 ## 6. 验证失败后仍能聊天
 
-为了少花费用，可临时把 `VISION_MODEL` 改成一个不存在的名称后启动：
+为了少花费用，可在启动窗口临时把“视觉模型”改成一个不存在的名称后启动：
 
 1. 发送一张图片，应只收到一次“暂时无法回复，请稍后再试”。这次服务商尝试会计入每日额度。
 2. 紧接着发送普通文字，应仍能得到 DeepSeek 回复。
-3. 按 `Ctrl+C` 停止，然后恢复正确的模型名。
+3. 点击“停止”，然后恢复正确的模型名。
 
 ## 7. 验收记录
 
