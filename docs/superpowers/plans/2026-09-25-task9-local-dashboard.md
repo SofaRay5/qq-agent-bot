@@ -197,7 +197,7 @@ git commit -m "feat: support live groupmate configuration"
 - Consumes: Task 9.1 configuration and Task 9.2 `GroupmateRuntime` replacement.
 - Produces: `BotService`, `BotManager.start(private, settings, persona)`, `BotManager.stop()`, `BotManager.update_runtime(private, settings, persona)`, `BotManager.state`, `SafeErrorBuffer`, `BudgetUsage`, `DailyBudget.usage() -> BudgetUsage`, and optional OneBot connection-state callback.
 
-- [ ] **Step 1: Write failing usage and connection-state tests.**
+- [x] **Step 1: Write failing usage and connection-state tests.**
 
 Assert `DailyBudget.usage()` returns zero before the first reservation and current total/proactive/vision counts afterward. Assert `OneBotClient` reports `"connected"`, `"reconnecting"` and `"stopped"` without exposing frames or credentials.
 
@@ -205,11 +205,11 @@ Run: `uv run pytest tests/test_budget.py tests/test_onebot_client.py -q`
 
 Expected: FAIL because these read/status interfaces do not exist.
 
-- [ ] **Step 2: Add read-only usage and connection callbacks.**
+- [x] **Step 2: Add read-only usage and connection callbacks.**
 
 Use the existing SQLite table and local date for `BudgetUsage`. Add an optional synchronous state callback to `OneBotClient`; do not add a generic event bus.
 
-- [ ] **Step 3: Write failing bot-service tests.**
+- [x] **Step 3: Write failing bot-service tests.**
 
 Test that `BotService` builds the existing client, budget, reply, optional vision, coordinator and dispatcher from validated objects; `update()` swaps only the message runtime; and shutdown always closes dispatcher work. Update current `main.py` tests to prove the environment-based CLI still uses the same service.
 
@@ -217,7 +217,7 @@ Run: `uv run pytest tests/test_bot_runtime.py tests/test_bot.py -q`
 
 Expected: FAIL because `BotService` does not exist.
 
-- [ ] **Step 4: Extract the reusable bot service.**
+- [x] **Step 4: Extract the reusable bot service.**
 
 Provide:
 
@@ -230,7 +230,7 @@ class BotService:
 
 `main.py` remains a thin environment/config adapter and `asyncio.run` entry point. Connection fields are fixed for the service lifetime; `update()` only replaces the Task 9.2 runtime bundle.
 
-- [ ] **Step 5: Write failing manager concurrency tests.**
+- [x] **Step 5: Write failing manager concurrency tests.**
 
 Using a fake `BotService`, call `start()` concurrently and assert one service/task. Call `stop()` repeatedly and concurrently with start; assert the manager serializes transitions, waits for cleanup, and ends in a truthful state. Assert invalid start configuration never constructs the service.
 
@@ -238,11 +238,11 @@ Run: `uv run pytest tests/test_dashboard_runtime.py -q`
 
 Expected: FAIL because `BotManager` does not exist.
 
-- [ ] **Step 6: Implement the minimal lifecycle manager and safe error buffer.**
+- [x] **Step 6: Implement the minimal lifecycle manager and safe error buffer.**
 
 `BotManager` owns one lock, one service and one task. `start(private, settings, persona)` validates before construction, `stop()` awaits cleanup, and `update_runtime(private, settings, persona)` updates only a running service's message snapshot. States are `"stopped"`, `"starting"`, `"connected"`, `"reconnecting"` and `"stopping"`. `SafeErrorBuffer` keeps 20 `(time, category)` entries, accepts predefined safe categories only and maps unknown exceptions to their class name without message text.
 
-- [ ] **Step 7: Verify and commit Task 9.3.**
+- [x] **Step 7: Verify and commit Task 9.3.**
 
 Run: `uv run pytest tests/test_budget.py tests/test_onebot_client.py tests/test_bot_runtime.py tests/test_bot.py tests/test_dashboard_runtime.py -q`
 
