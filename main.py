@@ -6,13 +6,8 @@ import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from agent.groupmate import GroupmateReply
-from agent.vision import VisionDescriber
-from config.models import ProviderSettings, load_persona, load_settings
-from core.budget import DailyBudget
-from core.dispatcher import Dispatcher
-from core.groupmate import GroupmateCoordinator
-from onebot_adapter.client import OneBotClient
+from bot_runtime import BotService
+from config.models import PrivateSettings, ProviderSettings, load_persona, load_settings
 
 ROOT = Path(__file__).resolve().parent
 
@@ -51,12 +46,13 @@ async def run() -> None:
     vision_enabled = os.environ.get("VISION_ENABLED", "0")
     if vision_enabled not in {"0", "1"}:
         raise ValueError("VISION_ENABLED must be 0 or 1")
-    vision_settings = None
+    vision_provider = ProviderSettings()
     if vision_enabled == "1":
-        vision_settings = (
-            _required("VISION_API_KEY"),
-            _required("VISION_MODEL"),
-            _validated_vision_url(),
+        vision_provider = ProviderSettings(
+            provider="openai_compatible",
+            base_url=_validated_vision_url(),
+            model=_required("VISION_MODEL"),
+            api_key=_required("VISION_API_KEY"),
         )
     parts = urlsplit(ws_url)
     if (
@@ -71,42 +67,19 @@ async def run() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     settings = load_settings(ROOT)
     persona = load_persona(ROOT)
-    budget = DailyBudget(settings, ROOT / "data" / "model_usage.db")
-    client = OneBotClient(ws_url, token)
-    reply = GroupmateReply(
-        persona,
-        ProviderSettings(
+    private = PrivateSettings(
+        napcat_ws_url=ws_url,
+        napcat_access_token=token,
+        chat=ProviderSettings(
             provider="deepseek",
             base_url="https://api.deepseek.com",
             model="deepseek-flash",
             api_key=api_key,
         ),
-        budget,
+        vision_enabled=vision_enabled == "1",
+        vision=vision_provider,
     )
-    vision = None
-    if vision_settings is not None:
-        vision_key, vision_model, vision_url = vision_settings
-        vision = VisionDescriber(
-            ProviderSettings(
-                provider="openai_compatible",
-                base_url=vision_url,
-                model=vision_model,
-                api_key=vision_key,
-            ),
-            budget,
-        )
-    coordinator = GroupmateCoordinator(
-        settings,
-        persona.name,
-        reply,
-        vision,
-        resolve_image=client.get_image_file if vision is not None else None,
-    )
-    dispatcher = Dispatcher(client, coordinator)
-    try:
-        await client.run(dispatcher.handle_event)
-    finally:
-        await dispatcher.close()
+    await BotService(ROOT, private, settings, persona).run()
 
 
 def main() -> None:

@@ -7,7 +7,7 @@ import pytest
 
 import core.budget as budget_module
 from config.models import Settings
-from core.budget import DailyBudget
+from core.budget import BudgetUsage, DailyBudget
 
 DEFAULT_SETTINGS = {
     "continuous_window_seconds": 600,
@@ -27,6 +27,26 @@ DEFAULT_SETTINGS = {
 
 def settings(**changes: object) -> Settings:
     return Settings.model_validate({**DEFAULT_SETTINGS, **changes})
+
+
+@pytest.mark.asyncio
+async def test_usage_is_zero_before_database_exists(tmp_path: Path) -> None:
+    path = tmp_path / "usage.db"
+    budget = DailyBudget(settings(), path)
+
+    assert await budget.usage() == BudgetUsage(total=0, proactive=0, vision=0)
+    assert not path.exists()
+
+
+@pytest.mark.asyncio
+async def test_usage_reports_current_daily_counts(tmp_path: Path) -> None:
+    budget = DailyBudget(settings(), tmp_path / "usage.db")
+
+    assert await budget.reserve("chat") == "ok"
+    assert await budget.reserve("proactive") == "ok"
+    assert await budget.reserve("vision") == "ok"
+
+    assert await budget.usage() == BudgetUsage(total=3, proactive=1, vision=1)
 
 
 @pytest.mark.asyncio

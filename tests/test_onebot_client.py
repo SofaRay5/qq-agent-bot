@@ -157,6 +157,7 @@ async def test_bad_frames_are_skipped_and_client_reconnects(
     seen: list[Event] = []
     private_seen = asyncio.Event()
     connections = 0
+    states: list[str] = []
 
     def on_event(event: Event) -> None:
         seen.append(event)
@@ -180,7 +181,11 @@ async def test_bad_frames_are_skipped_and_client_reconnects(
     async with serve(fake_napcat, "127.0.0.1", 0) as server:
         assert server.sockets
         port = server.sockets[0].getsockname()[1]
-        client = OneBotClient(f"ws://127.0.0.1:{port}/", "test-token")
+        client = OneBotClient(
+            f"ws://127.0.0.1:{port}/",
+            "test-token",
+            on_state=states.append,
+        )
         runner = asyncio.create_task(client.run(on_event))
         try:
             await asyncio.wait_for(private_seen.wait(), 2)
@@ -189,6 +194,10 @@ async def test_bad_frames_are_skipped_and_client_reconnects(
         finally:
             runner.cancel()
             await asyncio.gather(runner, return_exceptions=True)
+    assert states[0] == "connected"
+    assert "reconnecting" in states
+    assert states[-1] == "stopped"
+    assert "test-token" not in repr(states)
 
 
 async def test_send_helpers_use_text_segments(heartbeat_json: dict[str, Any]) -> None:

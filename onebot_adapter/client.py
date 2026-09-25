@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from pydantic import ValidationError
@@ -20,6 +20,7 @@ from onebot_adapter.event import (
 )
 
 Event = PrivateMessageEvent | GroupMessageEvent | HeartbeatEvent | UnknownEvent
+ConnectionState = Literal["connected", "reconnecting", "stopped"]
 ACTION_TIMEOUT_SECONDS = 10
 logger = logging.getLogger(__name__)
 
@@ -29,26 +30,44 @@ class OneBotActionError(Exception):
 
 
 class OneBotClient:
-    def __init__(self, ws_url: str, token: str) -> None:
+    def __init__(
+        self,
+        ws_url: str,
+        token: str,
+        *,
+        on_state: Callable[[ConnectionState], None] | None = None,
+    ) -> None:
         self.ws_url = ws_url
         self.token = token
+        self._on_state = on_state
         self._ws: ClientConnection | None = None
         self._pending: dict[str, asyncio.Future[dict[str, object]]] = {}
 
     async def run(self, on_event: Callable[[Event], None]) -> None:
         """Receive events and reconnect after a dropped NapCat connection."""
-        async for ws in connect(
-            self.ws_url, additional_headers={"Authorization": f"Bearer {self.token}"}
-        ):
-            self._ws = ws
-            try:
-                async for raw in ws:
-                    self._handle_frame(raw, on_event)
-            except ConnectionClosed:
-                logger.warning("NapCat connection closed")
-            finally:
-                self._ws = None
-                self._fail_pending()
+        try:
+            async for ws in connect(
+                self.ws_url, additional_headers={"Authorization": f"Bearer {self.token}"}
+            ):
+                self._ws = ws
+                self._notify_state("connected")
+                try:
+                    async for raw in ws:
+                        self._handle_frame(raw, on_event)
+                except ConnectionClosed:
+                    logger.warning("NapCat connection closed")
+                finally:
+                    self._ws = None
+                    self._fail_pending()
+                    self._notify_state("reconnecting")
+        finally:
+            self._ws = None
+            self._fail_pending()
+            self._notify_state("stopped")
+
+    def _notify_state(self, state: ConnectionState) -> None:
+        if self._on_state is not None:
+            self._on_state(state)
 
     def _handle_frame(self, raw: str | bytes, on_event: Callable[[Event], None]) -> None:
         try:

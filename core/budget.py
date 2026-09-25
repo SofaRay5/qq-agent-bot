@@ -2,6 +2,7 @@
 
 import asyncio
 import sqlite3
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Literal
@@ -10,6 +11,13 @@ from config.models import Settings
 
 BudgetKind = Literal["chat", "proactive", "vision"]
 BudgetResult = Literal["ok", "total", "proactive", "vision"]
+
+
+@dataclass(frozen=True)
+class BudgetUsage:
+    total: int
+    proactive: int
+    vision: int
 
 
 def _today() -> date:
@@ -24,6 +32,20 @@ class DailyBudget:
     async def reserve(self, kind: BudgetKind) -> BudgetResult:
         """Atomically reserve one provider call from today's limits."""
         return await asyncio.to_thread(self._reserve_sync, kind)
+
+    async def usage(self) -> BudgetUsage:
+        """Read today's persisted counters without reserving a call."""
+        return await asyncio.to_thread(self._usage_sync)
+
+    def _usage_sync(self) -> BudgetUsage:
+        if not self._db_path.exists():
+            return BudgetUsage(0, 0, 0)
+        with sqlite3.connect(self._db_path) as db:
+            row = db.execute(
+                "SELECT total, proactive, vision FROM model_usage WHERE day=?",
+                (_today().isoformat(),),
+            ).fetchone()
+        return BudgetUsage(*row) if row is not None else BudgetUsage(0, 0, 0)
 
     def _reserve_sync(self, kind: BudgetKind) -> BudgetResult:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)

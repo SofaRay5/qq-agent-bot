@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from websockets.asyncio.server import ServerConnection, serve
 
+import bot_runtime as runtime_module
 import main as bot_main
 from agent.groupmate import BudgetExceeded, HistoryMessage, ReplyMode
 from config.models import Persona, ProviderSettings
@@ -107,30 +108,28 @@ class FakeVision:
         return "一只猫"
 
 
-class IdleClient:
+class IdleService:
     constructed = False
 
-    def __init__(self, _url: str, _token: str) -> None:
+    def __init__(self, _root: Path, private: object, _settings: object, _persona: object) -> None:
+        assert private is not None
         type(self).constructed = True
 
-    async def run(self, _on_event: object) -> None:
+    async def run(self) -> None:
         pass
 
 
 @pytest.mark.asyncio
-async def test_example_files_are_loaded_before_client_construction(
+async def test_example_files_are_loaded_before_service_construction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     set_base_config(monkeypatch)
-    FakeReply.instances.clear()
-    IdleClient.constructed = False
-    monkeypatch.setattr(bot_main, "GroupmateReply", FakeReply, raising=False)
-    monkeypatch.setattr(bot_main, "OneBotClient", IdleClient)
+    IdleService.constructed = False
+    monkeypatch.setattr(bot_main, "BotService", IdleService)
 
     await run()
 
-    assert FakeReply.instances
-    assert IdleClient.constructed
+    assert IdleService.constructed
 
 
 @pytest.mark.parametrize("filename", ["settings.json", "persona.json"])
@@ -140,7 +139,7 @@ async def test_malformed_local_file_fails_before_client_construction(
 ) -> None:
     set_base_config(monkeypatch)
     (tmp_path / "config" / filename).write_text("{", encoding="utf-8")
-    monkeypatch.setattr(bot_main, "OneBotClient", lambda *_args: pytest.fail("client constructed"))
+    monkeypatch.setattr(bot_main, "BotService", lambda *_args: pytest.fail("service constructed"))
 
     with pytest.raises(ValueError, match="Invalid"):
         await run()
@@ -168,7 +167,7 @@ async def test_enabled_vision_requires_all_settings_before_connect(
     monkeypatch.setenv("VISION_MODEL", "vision-model")
     monkeypatch.setenv("VISION_API_KEY", "vision-key")
     monkeypatch.delenv(missing)
-    monkeypatch.setattr(bot_main, "OneBotClient", lambda *_args: pytest.fail("client constructed"))
+    monkeypatch.setattr(bot_main, "BotService", lambda *_args: pytest.fail("service constructed"))
     with pytest.raises(ValueError, match=missing):
         await run()
 
@@ -192,7 +191,7 @@ async def test_rejects_invalid_vision_base_url_before_connect(
     monkeypatch.setenv("VISION_API_BASE_URL", url)
     monkeypatch.setenv("VISION_MODEL", "vision-model")
     monkeypatch.setenv("VISION_API_KEY", "vision-key")
-    monkeypatch.setattr(bot_main, "OneBotClient", lambda *_args: pytest.fail("client constructed"))
+    monkeypatch.setattr(bot_main, "BotService", lambda *_args: pytest.fail("service constructed"))
     with pytest.raises(ValueError, match="VISION_API_BASE_URL"):
         await run()
 
@@ -234,8 +233,8 @@ async def test_fake_napcat_combined_groupmate_flow_and_safe_logs(
     monkeypatch.setenv("VISION_API_BASE_URL", "https://vision.example/v1")
     monkeypatch.setenv("VISION_MODEL", "vision-model")
     monkeypatch.setenv("VISION_API_KEY", "vision-key")
-    monkeypatch.setattr(bot_main, "GroupmateReply", FakeReply, raising=False)
-    monkeypatch.setattr(bot_main, "VisionDescriber", FakeVision, raising=False)
+    monkeypatch.setattr(runtime_module, "GroupmateReply", FakeReply)
+    monkeypatch.setattr(runtime_module, "VisionDescriber", FakeVision)
     FakeReply.instances.clear()
     FakeVision.instances.clear()
     actions: list[dict[str, Any]] = []
