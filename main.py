@@ -6,9 +6,12 @@ import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from agent.reply import LLMReply
-from agent.vision import VisionReply
+from agent.groupmate import GroupmateReply
+from agent.vision import VisionDescriber
+from config.models import load_persona, load_settings
+from core.budget import DailyBudget
 from core.dispatcher import Dispatcher
+from core.groupmate import GroupmateCoordinator
 from onebot_adapter.client import OneBotClient
 
 ROOT = Path(__file__).resolve().parent
@@ -66,19 +69,17 @@ async def run() -> None:
         raise ValueError("NAPCAT_WS_URL must point to a root ws:// or wss:// endpoint")
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    client = OneBotClient(ws_url, token)
-    chat_reply = LLMReply(api_key)
-    vision_reply = None
+    settings = load_settings(ROOT)
+    persona = load_persona(ROOT)
+    budget = DailyBudget(settings, ROOT / "data" / "model_usage.db")
+    reply = GroupmateReply(persona, api_key, budget)
+    vision = None
     if vision_settings is not None:
         vision_key, vision_model, vision_url = vision_settings
-        vision_reply = VisionReply(
-            chat_reply,
-            vision_key,
-            vision_model,
-            vision_url,
-            ROOT / "data" / "vision_usage.db",
-        )
-    dispatcher = Dispatcher(client, chat_reply, vision_reply=vision_reply)
+        vision = VisionDescriber(vision_key, vision_model, vision_url, budget)
+    coordinator = GroupmateCoordinator(settings, persona.name, reply, vision)
+    client = OneBotClient(ws_url, token)
+    dispatcher = Dispatcher(client, coordinator)
     try:
         await client.run(dispatcher.handle_event)
     finally:

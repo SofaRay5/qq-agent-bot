@@ -48,10 +48,11 @@
   - [x] Task 8 实施计划已写并自审。
   - [x] Task 8 实施计划审阅通过（2026-09-24）。
   - [x] Character Card V2 核心字段风格的 JSON 人格文件，仅所有者可改。
-  - [ ] @、回复机器人、叫名字触发；同群多人持续接话。
-  - [ ] 近期上下文按私聊和群隔离，持续窗口和次数可调。
-  - [ ] 随机与话题判断主动参与，默认关闭。
-  - [ ] 统一每日调用额度、主动参与额度和回复节奏。
+  - [x] @、回复机器人、叫名字触发；同群多人持续接话。
+  - [x] 近期上下文按私聊和群隔离，持续窗口和次数可调。
+  - [x] 随机与话题判断主动参与，默认关闭。
+  - [x] 统一每日调用额度、主动参与额度和回复节奏。
+  - [x] 启动装配、假 NapCat 组合测试和 [Task 8 测试指南](Task8测试指南.md)。
   - [ ] 真实群聊行为与费用边界验收。
 - [ ] **Task 9：本地浏览器后台与模型切换**
   - [x] 总设计中的目标与边界已确认。
@@ -82,4 +83,5 @@
 
 - [AI 群友扩展总设计](superpowers/specs/2026-09-24-ai-groupmate-expansion-design.md)
 - [Task 7 实施计划](superpowers/plans/2026-09-24-task7-image-understanding.md)
+- [Task 8 实施计划](superpowers/plans/2026-09-24-task8-groupmate-behavior.md)
 - [Task 1–6 实施计划](superpowers/plans/2026-09-23-qq-bot-mvp.md)

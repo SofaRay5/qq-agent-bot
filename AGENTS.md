@@ -6,7 +6,7 @@ Build a usable QQ bot with OneBot v11 (NapCat) and an LLM. This is now an AI-ass
 
 ## Current State and Roadmap
 
-`onebot_adapter/event.py` parses private/group messages and heartbeats with an `UnknownEvent` fallback. The WebSocket client, echo loop, and single-turn DeepSeek reply have passed local tests and real QQ acceptance. Optional image understanding is implemented, off by default, and awaits real NapCat plus vision-model acceptance. Follow the top-level [docs/任务Checklist.md](docs/任务Checklist.md) for Task 1–11 progress. [docs/里程碑Checklist.md](docs/里程碑Checklist.md) retains MVP acceptance evidence. The old hand-coding checklist is archived at [docs/archive/里程碑Checklist-学习版.md](docs/archive/里程碑Checklist-学习版.md) for historical reference only.
+The WebSocket client and basic DeepSeek replies have passed local tests and real QQ acceptance. Task 8 adds validated settings and persona files, bounded in-memory private/group context, explicit and optional proactive group triggers, a shared SQLite daily model budget, and optional image descriptions. Task 7 image understanding and Task 8 groupmate behavior await real-service acceptance. Follow [docs/任务Checklist.md](docs/任务Checklist.md) for Task 1–11 progress and [docs/Task8测试指南.md](docs/Task8测试指南.md) for current operating checks.
 
 ## Architecture
 

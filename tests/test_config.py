@@ -1,4 +1,5 @@
 import json
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -266,6 +267,9 @@ def test_loader_errors_name_fields_without_leaking_values(tmp_path: Path) -> Non
     assert "unexpected" in message
     assert persona_body not in message
     assert secret not in message
+    rendered = "".join(traceback.format_exception(caught.type, caught.value, caught.tb))
+    assert persona_body not in rendered
+    assert secret not in rendered
 
 
 def test_loader_reports_invalid_json_without_echoing_it(tmp_path: Path) -> None:

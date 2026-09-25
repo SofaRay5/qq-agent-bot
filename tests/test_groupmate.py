@@ -553,6 +553,18 @@ async def test_disabled_vision_only_notifies_eligible_images() -> None:
 
 
 @pytest.mark.asyncio
+async def test_proactive_image_stays_silent_when_vision_is_disabled() -> None:
+    reply = FakeReply()
+    bot = coordinator(reply, config=settings(proactive_mode="topic"))
+    send = SendRecorder()
+
+    await bot.handle(group_event("", image=True), send)
+
+    assert send.messages == []
+    assert reply.calls == []
+
+
+@pytest.mark.asyncio
 async def test_budget_messages_are_only_sent_for_explicit_triggers() -> None:
     reply = FakeReply(["开始", BudgetExceeded("total"), BudgetExceeded("total")])
     bot = coordinator(reply)

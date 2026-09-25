@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-NapCat echo 闭环和 DeepSeek 回复均已完成本地自动化与真实 QQ 验收。Task 7 识图已完成代码和假服务检查，等待真实 NapCat 与视觉模型验收。本文件保留 MVP 验收记录；Task 1–11 的最新进度见 [任务Checklist](任务Checklist.md)，MVP 细步骤见 [原实施计划](superpowers/plans/2026-09-23-qq-bot-mvp.md)。
+NapCat echo 闭环和 DeepSeek 回复均已完成本地自动化与真实 QQ 验收。Task 7 识图和 Task 8 群友行为已完成代码与假服务检查，等待真实服务验收。本文件保留 MVP 验收记录；Task 1–11 的最新进度见 [任务Checklist](任务Checklist.md)，MVP 细步骤见 [原实施计划](superpowers/plans/2026-09-23-qq-bot-mvp.md)。
 
 ## 1. 环境可复现
 

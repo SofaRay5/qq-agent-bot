@@ -142,9 +142,11 @@ class GroupmateCoordinator:
     def _remember(self, state: SessionState, role: str, content: str) -> None:
         history = HistoryMessage("user" if role == "user" else "assistant", content)
         state.history.append(history)
-        while len(state.history) > self._settings.context_max_messages or sum(
-            len(item.content) for item in state.history
-        ) > self._settings.context_max_characters:
+        while (
+            len(state.history) > self._settings.context_max_messages
+            or sum(len(item.content) for item in state.history)
+            > self._settings.context_max_characters
+        ):
             state.history.popleft()
 
     async def _send(
@@ -214,9 +216,7 @@ class GroupmateCoordinator:
         current = self._current(event, content)
         if state.last_sent_at is not None:
             remaining = (
-                state.last_sent_at
-                + self._settings.minimum_reply_interval_seconds
-                - self._now()
+                state.last_sent_at + self._settings.minimum_reply_interval_seconds - self._now()
             )
             if remaining > 0:
                 if explicit:
@@ -227,8 +227,9 @@ class GroupmateCoordinator:
                     return
 
         if content.image is not None and self._vision is None:
-            if remember:
-                self._remember(state, "user", current)
+            if not remember:
+                return
+            self._remember(state, "user", current)
             await self._send(
                 state,
                 event,

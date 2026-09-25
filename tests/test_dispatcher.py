@@ -1,9 +1,12 @@
 import asyncio
+import logging
+from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
 import pytest
 
-from core.dispatcher import Dispatcher, echo_reply
+from core.dispatcher import Dispatcher
+from core.groupmate import GroupmateCoordinator
 from onebot_adapter.client import OneBotClient
 from onebot_adapter.event import GroupMessageEvent, HeartbeatEvent, PrivateMessageEvent
 from onebot_adapter.message import (
@@ -22,19 +25,42 @@ class FakeClient:
         self.fail_send = False
         self.send_attempts = 0
 
-    async def send_private_message(self, user_id: int, text: str) -> None:
+    async def send_private_message(self, user_id: int, text: str) -> int | None:
         self.send_attempts += 1
         if self.fail_send:
-            raise ConnectionError("disconnected")
+            raise ConnectionError("private send detail")
         self.private.append((user_id, text))
+        return 41
 
-    async def send_group_message(self, group_id: int, text: str) -> None:
+    async def send_group_message(self, group_id: int, text: str) -> int | None:
+        self.send_attempts += 1
+        if self.fail_send:
+            raise ConnectionError("group send detail")
         self.group.append((group_id, text))
+        return 42
+
+
+class FakeCoordinator:
+    def __init__(self) -> None:
+        self.events: list[PrivateMessageEvent | GroupMessageEvent] = []
+        self.sent_ids: list[int | None] = []
+        self.started = asyncio.Event()
+        self.block = False
+
+    async def handle(
+        self,
+        event: PrivateMessageEvent | GroupMessageEvent,
+        send: Callable[[str], Awaitable[int | None]],
+    ) -> None:
+        self.events.append(event)
+        self.started.set()
+        if self.block:
+            await asyncio.Event().wait()
+        self.sent_ids.append(await send("协调器回复"))
 
 
 async def settle(dispatcher: Dispatcher) -> None:
     await asyncio.gather(*tuple(dispatcher._tasks))
-    await dispatcher.close()
 
 
 def private_event(data: dict[str, Any]) -> PrivateMessageEvent:
@@ -100,7 +126,6 @@ def test_group_image_must_follow_bot_mention(group_message_json: dict[str, Any])
         {"type": "image", "data": {"url": after, "file_size": "42"}},
     ]
     assert image_for_reply(group_event(group_message_json)) == ImageRef(after, 42)
-
     group_message_json["message"] = [{"type": "image", "data": {"url": after}}]
     assert image_for_reply(group_event(group_message_json)) is None
 
@@ -115,12 +140,8 @@ def test_content_uses_only_segments_after_bot_mention(
         {"type": "reply", "data": {"id": "77"}},
         {"type": "text", "data": {"text": " hello"}},
     ]
-
     assert content_for_event(group_event(group_message_json)) == MessageContent(
-        text="hello",
-        image=None,
-        mentioned=True,
-        reply_to=77,
+        text="hello", image=None, mentioned=True, reply_to=77
     )
 
 
@@ -129,7 +150,6 @@ def test_content_keeps_unmentioned_group_image(group_message_json: dict[str, Any
         {"type": "text", "data": {"text": " 看图 "}},
         {"type": "image", "data": {"url": "https://qpic.cn/image", "file_size": "42"}},
     ]
-
     event = group_event(group_message_json)
     assert content_for_event(event) == MessageContent(
         text="看图",
@@ -162,193 +182,99 @@ def test_content_parses_only_valid_reply_ids(
         {"type": "reply", "data": reply_data},
         {"type": "text", "data": {"text": "回复别人的消息"}},
     ]
-
     assert content_for_event(group_event(group_message_json)).reply_to == expected
 
 
 def test_private_content_exposes_plain_text(private_message_json: dict[str, Any]) -> None:
     assert content_for_event(private_event(private_message_json)) == MessageContent(
-        text="你好",
-        image=None,
-        mentioned=False,
-        reply_to=None,
+        text="你好", image=None, mentioned=False, reply_to=None
     )
 
 
 @pytest.mark.asyncio
-async def test_image_only_reports_vision_disabled(
-    private_message_json: dict[str, Any], group_message_json: dict[str, Any]
+async def test_dispatcher_selects_send_helper_and_returns_message_id(
+    private_message_json: dict[str, Any],
+    group_message_json: dict[str, Any],
 ) -> None:
-    image = {"type": "image", "data": {"url": "https://qpic.cn/image"}}
-    private_message_json["message"] = [image]
-    group_message_json["message"] = [
-        {"type": "at", "data": {"qq": "123456"}},
-        image,
-    ]
     client = FakeClient()
-    dispatcher = Dispatcher(cast(OneBotClient, client), echo_reply)
+    coordinator = FakeCoordinator()
+    dispatcher = Dispatcher(cast(OneBotClient, client), cast(GroupmateCoordinator, coordinator))
     dispatcher.handle_event(private_event(private_message_json))
     dispatcher.handle_event(group_event(group_message_json))
     await settle(dispatcher)
-    assert client.private == [(111, "识图尚未开启")]
-    assert client.group == [(999, "识图尚未开启")]
+
+    assert client.private == [(111, "协调器回复")]
+    assert client.group == [(999, "协调器回复")]
+    assert coordinator.sent_ids == [41, 42]
 
 
 @pytest.mark.asyncio
-async def test_image_uses_vision_reply_with_optional_text(
+async def test_dispatcher_ignores_non_messages_self_messages_and_duplicates(
+    private_message_json: dict[str, Any],
+    heartbeat_json: dict[str, Any],
+) -> None:
+    coordinator = FakeCoordinator()
+    dispatcher = Dispatcher(
+        cast(OneBotClient, FakeClient()), cast(GroupmateCoordinator, coordinator)
+    )
+    event = private_event(private_message_json)
+    dispatcher.handle_event(HeartbeatEvent.model_validate(heartbeat_json))
+    dispatcher.handle_event(private_event({**private_message_json, "user_id": 123456}))
+    dispatcher.handle_event(event)
+    dispatcher.handle_event(event)
+    await settle(dispatcher)
+
+    assert coordinator.events == [event]
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_keeps_1024_message_dedup_window(
     private_message_json: dict[str, Any],
 ) -> None:
-    calls: list[tuple[str, str, int | None]] = []
-
-    async def vision_reply(text: str, url: str, size: int | None) -> str:
-        calls.append((text, url, size))
-        return "看到了"
-
-    private_message_json["message"] = [
-        {"type": "text", "data": {"text": " 这是什么？ "}},
-        {"type": "image", "data": {"url": "https://qpic.cn/image", "file_size": "42"}},
-    ]
-    client = FakeClient()
-    dispatcher = Dispatcher(cast(OneBotClient, client), echo_reply, vision_reply=vision_reply)
-    dispatcher.handle_event(private_event(private_message_json))
-    await settle(dispatcher)
-    assert calls == [("这是什么？", "https://qpic.cn/image", 42)]
-    assert client.private == [(111, "看到了")]
-
-
-@pytest.mark.asyncio
-async def test_image_only_passes_empty_text_to_vision(private_message_json: dict[str, Any]) -> None:
-    calls: list[tuple[str, str, int | None]] = []
-
-    async def vision_reply(text: str, url: str, size: int | None) -> str:
-        calls.append((text, url, size))
-        return "图片"
-
-    private_message_json["message"] = [{"type": "image", "data": {"url": "https://qpic.cn/image"}}]
-    client = FakeClient()
-    dispatcher = Dispatcher(cast(OneBotClient, client), echo_reply, vision_reply=vision_reply)
-    dispatcher.handle_event(private_event(private_message_json))
-    await settle(dispatcher)
-    assert calls == [("", "https://qpic.cn/image", None)]
-
-
-@pytest.mark.asyncio
-async def test_private_echo_and_ignored_events(
-    private_message_json: dict[str, Any], heartbeat_json: dict[str, Any]
-) -> None:
-    client = FakeClient()
-    dispatcher = Dispatcher(cast(OneBotClient, client), echo_reply)
-    dispatcher.handle_event(private_event(private_message_json))
-    dispatcher.handle_event(HeartbeatEvent.model_validate(heartbeat_json))
-    own = {**private_message_json, "message_id": 2, "user_id": 123456}
-    dispatcher.handle_event(private_event(own))
-    blank = {
-        **private_message_json,
-        "message_id": 3,
-        "message": [{"type": "text", "data": {"text": "  "}}],
-    }
-    dispatcher.handle_event(private_event(blank))
-    await settle(dispatcher)
-    assert client.private == [(111, "你好")]
-
-
-@pytest.mark.parametrize("qq", ["123456", 123456])
-@pytest.mark.asyncio
-async def test_group_mention_uses_only_following_text(
-    group_message_json: dict[str, Any], qq: str | int
-) -> None:
-    group_message_json["message"] = [
-        {"type": "text", "data": {"text": "ignored "}},
-        {"type": "at", "data": {"qq": qq}},
-        {"type": "text", "data": "bad"},
-        {"type": "text", "data": {"text": " hi"}},
-    ]
-    event = group_event(group_message_json)
-    assert text_for_reply(event) == "hi"
-    client = FakeClient()
-    dispatcher = Dispatcher(cast(OneBotClient, client), echo_reply)
-    dispatcher.handle_event(event)
-    await settle(dispatcher)
-    assert client.group == [(999, "hi")]
-
-
-@pytest.mark.asyncio
-async def test_unmentioned_and_at_all_are_ignored(group_message_json: dict[str, Any]) -> None:
-    client = FakeClient()
-    dispatcher = Dispatcher(cast(OneBotClient, client), echo_reply)
-    dispatcher.handle_event(group_event(group_message_json))
-    group_message_json["message"] = [
-        {"type": "at", "data": {"qq": "all"}},
-        {"type": "text", "data": {"text": "hello"}},
-    ]
-    dispatcher.handle_event(group_event(group_message_json))
-    await settle(dispatcher)
-    assert client.group == []
-
-
-@pytest.mark.asyncio
-async def test_dedup_window(private_message_json: dict[str, Any]) -> None:
-    client = FakeClient()
-    dispatcher = Dispatcher(cast(OneBotClient, client), echo_reply)
-    event = private_event(private_message_json)
-    dispatcher.handle_event(event)
-    dispatcher.handle_event(event)
+    coordinator = FakeCoordinator()
+    dispatcher = Dispatcher(
+        cast(OneBotClient, FakeClient()), cast(GroupmateCoordinator, coordinator)
+    )
+    first = private_event(private_message_json)
+    dispatcher.handle_event(first)
     for message_id in range(2, 1027):
         dispatcher.handle_event(private_event({**private_message_json, "message_id": message_id}))
-    dispatcher.handle_event(event)
+    dispatcher.handle_event(first)
     await settle(dispatcher)
-    assert len(client.private) == 1027
+
+    assert len(coordinator.events) == 1027
 
 
 @pytest.mark.asyncio
-async def test_reply_failure_sends_one_fallback(private_message_json: dict[str, Any]) -> None:
-    async def fail_reply(_text: str) -> str:
-        raise TimeoutError
-
-    client = FakeClient()
-    dispatcher = Dispatcher(cast(OneBotClient, client), fail_reply)
-    dispatcher.handle_event(private_event(private_message_json))
-    await settle(dispatcher)
-    assert client.private == [(111, "暂时无法回复，请稍后再试")]
-
-
-@pytest.mark.asyncio
-async def test_send_failure_does_not_retry(private_message_json: dict[str, Any]) -> None:
-    calls = 0
-
-    async def reply(text: str) -> str:
-        nonlocal calls
-        calls += 1
-        return text
-
+async def test_dispatcher_isolates_send_failure_without_retry_or_detail(
+    private_message_json: dict[str, Any],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     client = FakeClient()
     client.fail_send = True
-    dispatcher = Dispatcher(cast(OneBotClient, client), reply)
-    dispatcher.handle_event(private_event(private_message_json))
-    await settle(dispatcher)
-    assert calls == 1
+    dispatcher = Dispatcher(
+        cast(OneBotClient, client), cast(GroupmateCoordinator, FakeCoordinator())
+    )
+    with caplog.at_level(logging.ERROR, logger="core.dispatcher"):
+        dispatcher.handle_event(private_event(private_message_json))
+        await settle(dispatcher)
+
     assert client.send_attempts == 1
-    assert client.private == []
+    assert "ConnectionError" in caplog.text
+    assert "private send detail" not in caplog.text
 
 
 @pytest.mark.asyncio
-async def test_close_cancels_pending_reply(private_message_json: dict[str, Any]) -> None:
-    started = asyncio.Event()
-    cancelled = asyncio.Event()
-
-    async def slow_reply(_text: str) -> str:
-        started.set()
-        try:
-            await asyncio.Event().wait()
-        except asyncio.CancelledError:
-            cancelled.set()
-            raise
-        return ""
-
-    client = FakeClient()
-    dispatcher = Dispatcher(cast(OneBotClient, client), slow_reply)
+async def test_close_cancels_and_awaits_coordinator(
+    private_message_json: dict[str, Any],
+) -> None:
+    coordinator = FakeCoordinator()
+    coordinator.block = True
+    dispatcher = Dispatcher(
+        cast(OneBotClient, FakeClient()), cast(GroupmateCoordinator, coordinator)
+    )
     dispatcher.handle_event(private_event(private_message_json))
-    await started.wait()
+    await coordinator.started.wait()
     await dispatcher.close()
-    assert cancelled.is_set()
-    assert client.private == []
+
+    assert not dispatcher._tasks

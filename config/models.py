@@ -79,11 +79,9 @@ def _load[T: BaseModel](root: Path, name: str, model: type[T]) -> T:
     except ValidationError as exc:
         errors = exc.errors(include_input=False)
         if errors and errors[0]["type"] == "json_invalid":
-            raise ValueError(f"Invalid {name} JSON") from exc
-        fields = ", ".join(
-            ".".join(map(str, item["loc"])) or str(item["msg"]) for item in errors
-        )
-        raise ValueError(f"Invalid {name} fields: {fields}") from exc
+            raise ValueError(f"Invalid {name} JSON") from None
+        fields = ", ".join(".".join(map(str, item["loc"])) or str(item["msg"]) for item in errors)
+        raise ValueError(f"Invalid {name} fields: {fields}") from None
 
 
 def load_settings(root: Path) -> Settings:
