@@ -6,7 +6,13 @@ import pytest
 from core.dispatcher import Dispatcher, echo_reply
 from onebot_adapter.client import OneBotClient
 from onebot_adapter.event import GroupMessageEvent, HeartbeatEvent, PrivateMessageEvent
-from onebot_adapter.message import ImageRef, image_for_reply, text_for_reply
+from onebot_adapter.message import (
+    ImageRef,
+    MessageContent,
+    content_for_event,
+    image_for_reply,
+    text_for_reply,
+)
 
 
 class FakeClient:
@@ -97,6 +103,76 @@ def test_group_image_must_follow_bot_mention(group_message_json: dict[str, Any])
 
     group_message_json["message"] = [{"type": "image", "data": {"url": after}}]
     assert image_for_reply(group_event(group_message_json)) is None
+
+
+def test_content_uses_only_segments_after_bot_mention(
+    group_message_json: dict[str, Any],
+) -> None:
+    group_message_json["message"] = [
+        {"type": "text", "data": {"text": "ignored"}},
+        {"type": "image", "data": {"url": "https://qpic.cn/before"}},
+        {"type": "at", "data": {"qq": "123456"}},
+        {"type": "reply", "data": {"id": "77"}},
+        {"type": "text", "data": {"text": " hello"}},
+    ]
+
+    assert content_for_event(group_event(group_message_json)) == MessageContent(
+        text="hello",
+        image=None,
+        mentioned=True,
+        reply_to=77,
+    )
+
+
+def test_content_keeps_unmentioned_group_image(group_message_json: dict[str, Any]) -> None:
+    group_message_json["message"] = [
+        {"type": "text", "data": {"text": " 看图 "}},
+        {"type": "image", "data": {"url": "https://qpic.cn/image", "file_size": "42"}},
+    ]
+
+    event = group_event(group_message_json)
+    assert content_for_event(event) == MessageContent(
+        text="看图",
+        image=ImageRef("https://qpic.cn/image", 42),
+        mentioned=False,
+        reply_to=None,
+    )
+    assert text_for_reply(event) is None
+    assert image_for_reply(event) is None
+
+
+@pytest.mark.parametrize(
+    ("reply_data", "expected"),
+    [
+        ({"id": 88}, 88),
+        ({"id": "99"}, 99),
+        ({"id": True}, None),
+        ({"id": "-1"}, None),
+        ({"id": "not-a-number"}, None),
+        ({}, None),
+        ("bad", None),
+    ],
+)
+def test_content_parses_only_valid_reply_ids(
+    group_message_json: dict[str, Any],
+    reply_data: object,
+    expected: int | None,
+) -> None:
+    group_message_json["message"] = [
+        {"type": "reply", "data": reply_data},
+        {"type": "text", "data": {"text": "回复别人的消息"}},
+    ]
+
+    assert content_for_event(group_event(group_message_json)).reply_to == expected
+
+
+def test_private_content_exposes_plain_text(private_message_json: dict[str, Any]) -> None:
+    assert content_for_event(private_event(private_message_json)) == MessageContent(
+        text="你好",
+        image=None,
+        mentioned=False,
+        reply_to=None,
+    )
 
 
 @pytest.mark.asyncio

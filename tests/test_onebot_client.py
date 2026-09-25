@@ -205,7 +205,7 @@ async def test_send_helpers_use_text_segments(heartbeat_json: dict[str, Any]) ->
                     {
                         "status": "ok",
                         "retcode": 0,
-                        "data": {"message_id": 1},
+                        "data": {"message_id": 41},
                         "echo": action["echo"],
                     }
                 )
@@ -219,8 +219,10 @@ async def test_send_helpers_use_text_segments(heartbeat_json: dict[str, Any]) ->
         runner = asyncio.create_task(client.run(lambda event: ready.set()))
         try:
             await asyncio.wait_for(ready.wait(), 2)
-            await asyncio.wait_for(client.send_private_message(111, "你好"), 1)
-            await asyncio.wait_for(client.send_group_message(999, "hi"), 1)
+            private_id = await asyncio.wait_for(client.send_private_message(111, "你好"), 1)
+            group_id = await asyncio.wait_for(client.send_group_message(999, "hi"), 1)
+            assert private_id == 41
+            assert group_id == 41
             assert [(action["action"], action["params"]) for action in sent] == [
                 (
                     "send_private_msg",
@@ -234,3 +236,28 @@ async def test_send_helpers_use_text_segments(heartbeat_json: dict[str, Any]) ->
         finally:
             runner.cancel()
             await asyncio.gather(runner, return_exceptions=True)
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        None,
+        [],
+        {},
+        {"message_id": True},
+        {"message_id": "41"},
+    ],
+)
+async def test_send_helpers_ignore_invalid_message_ids(
+    monkeypatch: pytest.MonkeyPatch,
+    data: object,
+) -> None:
+    client = OneBotClient("ws://127.0.0.1:3001/", "test-token")
+
+    async def call_action(_action: str, _params: dict[str, object]) -> dict[str, object]:
+        return {"status": "ok", "retcode": 0, "data": data}
+
+    monkeypatch.setattr(client, "call_action", call_action)
+
+    assert await client.send_private_message(111, "你好") is None
+    assert await client.send_group_message(999, "你好") is None

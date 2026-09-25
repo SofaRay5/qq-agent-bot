@@ -10,11 +10,16 @@ class ImageRef(NamedTuple):
     file_size: int | None
 
 
-def _segments_for_reply(
-    event: PrivateMessageEvent | GroupMessageEvent,
-) -> list[dict[str, Any]]:
+class MessageContent(NamedTuple):
+    text: str | None
+    image: ImageRef | None
+    mentioned: bool
+    reply_to: int | None
+
+
+def _bot_mention_index(event: PrivateMessageEvent | GroupMessageEvent) -> int | None:
     if isinstance(event, PrivateMessageEvent):
-        return event.message
+        return None
     for index, segment in enumerate(event.message):
         data = segment.get("data")
         if (
@@ -22,14 +27,13 @@ def _segments_for_reply(
             and isinstance(data, dict)
             and str(data.get("qq")) == str(event.self_id)
         ):
-            return event.message[index + 1 :]
-    return []
+            return index
+    return None
 
 
-def text_for_reply(event: PrivateMessageEvent | GroupMessageEvent) -> str | None:
-    """Return private text or text following the bot mention in a group."""
+def _text(segments: list[dict[str, Any]]) -> str | None:
     parts: list[str] = []
-    for segment in _segments_for_reply(event):
+    for segment in segments:
         data = segment.get("data")
         if segment.get("type") == "text" and isinstance(data, dict):
             value = data.get("text")
@@ -38,9 +42,8 @@ def text_for_reply(event: PrivateMessageEvent | GroupMessageEvent) -> str | None
     return "".join(parts).strip() or None
 
 
-def image_for_reply(event: PrivateMessageEvent | GroupMessageEvent) -> ImageRef | None:
-    """Return the first ordinary image eligible for a reply."""
-    for segment in _segments_for_reply(event):
+def _image(segments: list[dict[str, Any]]) -> ImageRef | None:
+    for segment in segments:
         if segment.get("type") != "image":
             continue
         raw_data = segment.get("data")
@@ -59,3 +62,54 @@ def image_for_reply(event: PrivateMessageEvent | GroupMessageEvent) -> ImageRef 
         url = data.get("url")
         return ImageRef(url if isinstance(url, str) else "", file_size)
     return None
+
+
+def _reply_target(segments: list[dict[str, Any]]) -> int | None:
+    for segment in segments:
+        data = segment.get("data")
+        if segment.get("type") != "reply" or not isinstance(data, dict):
+            continue
+        value = data.get("id")
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            continue
+        text = str(value)
+        if not text.isascii() or not text.isdigit():
+            continue
+        try:
+            return int(text)
+        except ValueError:
+            continue
+    return None
+
+
+def content_for_event(event: PrivateMessageEvent | GroupMessageEvent) -> MessageContent:
+    """Extract text, image and trigger metadata from one message event."""
+    mention_index = _bot_mention_index(event)
+    if mention_index is None:
+        mentioned = False
+        selected = event.message
+    else:
+        mentioned = True
+        selected = event.message[mention_index + 1 :]
+    return MessageContent(
+        text=_text(selected),
+        image=_image(selected),
+        mentioned=mentioned,
+        reply_to=_reply_target(event.message),
+    )
+
+
+def text_for_reply(event: PrivateMessageEvent | GroupMessageEvent) -> str | None:
+    """Return private text or text following the bot mention in a group."""
+    content = content_for_event(event)
+    if isinstance(event, GroupMessageEvent) and not content.mentioned:
+        return None
+    return content.text
+
+
+def image_for_reply(event: PrivateMessageEvent | GroupMessageEvent) -> ImageRef | None:
+    """Return the first ordinary image eligible for a reply."""
+    content = content_for_event(event)
+    if isinstance(event, GroupMessageEvent) and not content.mentioned:
+        return None
+    return content.image

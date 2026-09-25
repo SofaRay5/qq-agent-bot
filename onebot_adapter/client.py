@@ -105,16 +105,26 @@ class OneBotClient:
             raise OneBotActionError("NapCat action failed")
         return result
 
-    async def send_private_message(self, user_id: int, text: str) -> None:
-        """Send a text segment to a private chat."""
-        await self.call_action(
+    async def send_private_message(self, user_id: int, text: str) -> int | None:
+        """Send a private text message and return NapCat's integer message ID."""
+        result = await self.call_action(
             "send_private_msg",
             {"user_id": user_id, "message": [{"type": "text", "data": {"text": text}}]},
         )
+        return _message_id(result)
 
-    async def send_group_message(self, group_id: int, text: str) -> None:
-        """Send a text segment to a group chat."""
-        await self.call_action(
+    async def send_group_message(self, group_id: int, text: str) -> int | None:
+        """Send a group text message and return NapCat's integer message ID."""
+        result = await self.call_action(
             "send_group_msg",
             {"group_id": group_id, "message": [{"type": "text", "data": {"text": text}}]},
         )
+        return _message_id(result)
+
+
+def _message_id(result: dict[str, object]) -> int | None:
+    data = result.get("data")
+    if not isinstance(data, dict):
+        return None
+    value = data.get("message_id")
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
