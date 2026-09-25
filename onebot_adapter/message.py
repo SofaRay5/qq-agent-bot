@@ -8,6 +8,7 @@ from onebot_adapter.event import GroupMessageEvent, PrivateMessageEvent
 class ImageRef(NamedTuple):
     url: str
     file_size: int | None
+    file: str = ""
 
 
 class MessageContent(NamedTuple):
@@ -60,7 +61,12 @@ def _image(segments: list[dict[str, Any]]) -> ImageRef | None:
         except ValueError:
             file_size = None
         url = data.get("url")
-        return ImageRef(url if isinstance(url, str) else "", file_size)
+        file = data.get("file")
+        return ImageRef(
+            url if isinstance(url, str) else "",
+            file_size,
+            file if isinstance(file, str) else "",
+        )
     return None
 
 

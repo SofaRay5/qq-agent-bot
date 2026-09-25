@@ -15,6 +15,7 @@ from agent.groupmate import (
     HistoryMessage,
     ReplyMode,
 )
+from agent.image_fetch import ImageDownloadError
 from agent.vision import VisionDescriber
 from config.models import Settings
 from onebot_adapter.event import GroupMessageEvent, PrivateMessageEvent
@@ -28,6 +29,7 @@ VISION_DISABLED_REPLY = "识图尚未开启"
 logger = logging.getLogger(__name__)
 
 Send = Callable[[str], Awaitable[int | None]]
+ResolveImage = Callable[[str], Awaitable[str]]
 
 
 @dataclass
@@ -49,6 +51,7 @@ class GroupmateCoordinator:
         reply: GroupmateReply,
         vision: VisionDescriber | None,
         *,
+        resolve_image: ResolveImage | None = None,
         now: Callable[[], float] = time.monotonic,
         random_value: Callable[[], float] = random.random,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
@@ -57,6 +60,7 @@ class GroupmateCoordinator:
         self._persona_name = persona_name
         self._reply = reply
         self._vision = vision
+        self._resolve_image = resolve_image
         self._now = now
         self._random_value = random_value
         self._sleep = sleep
@@ -244,14 +248,25 @@ class GroupmateCoordinator:
         if count_window:
             state.attempts += 1
 
+        stage = "vision" if content.image is not None else "reply"
         try:
             if content.image is not None:
                 assert self._vision is not None
-                caption = await asyncio.wait_for(
-                    self._vision(content.image.url, content.image.file_size),
-                    timeout=MODEL_TIMEOUT_SECONDS,
-                )
+                try:
+                    caption = await asyncio.wait_for(
+                        self._vision(content.image.url, content.image.file_size),
+                        timeout=MODEL_TIMEOUT_SECONDS,
+                    )
+                except ImageDownloadError:
+                    if self._resolve_image is None or not content.image.file:
+                        raise
+                    path = await self._resolve_image(content.image.file)
+                    caption = await asyncio.wait_for(
+                        self._vision.describe_file(path, content.image.file_size),
+                        timeout=MODEL_TIMEOUT_SECONDS,
+                    )
                 current = self._current(event, content, caption)
+                stage = "reply"
             answer = await asyncio.wait_for(
                 self._reply(tuple(state.history), current, mode, budget_kind),
                 timeout=MODEL_TIMEOUT_SECONDS,
@@ -274,7 +289,12 @@ class GroupmateCoordinator:
             return
         except Exception as exc:
             session_type = "group" if is_group else "private"
-            logger.error("groupmate failed: %s session=%s", type(exc).__name__, session_type)
+            logger.error(
+                "groupmate failed: %s session=%s stage=%s",
+                type(exc).__name__,
+                session_type,
+                stage,
+            )
             if remember:
                 self._remember(state, "user", current)
             if explicit:

@@ -75,8 +75,17 @@ def group_event(data: dict[str, Any]) -> GroupMessageEvent:
     ("segments", "expected"),
     [
         (
-            [{"type": "image", "data": {"url": "https://qpic.cn/first", "file_size": "42"}}],
-            ImageRef("https://qpic.cn/first", 42),
+            [
+                {
+                    "type": "image",
+                    "data": {
+                        "url": "https://qpic.cn/first",
+                        "file_size": "42",
+                        "file": "cached.jpg",
+                    },
+                }
+            ],
+            ImageRef("https://qpic.cn/first", 42, "cached.jpg"),
         ),
         (
             [

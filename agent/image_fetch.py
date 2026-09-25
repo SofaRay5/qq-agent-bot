@@ -2,8 +2,10 @@
 
 import asyncio
 import ipaddress
+import os
 import socket
 import ssl
+import stat
 from collections.abc import Iterable
 from typing import Any
 from urllib.parse import urlsplit
@@ -12,6 +14,10 @@ import httpcore
 import httpx
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
+
+
+class ImageDownloadError(ValueError):
+    """The remote image could not be downloaded safely."""
 
 
 class _PinnedBackend(httpcore.AsyncNetworkBackend):
@@ -125,3 +131,17 @@ async def fetch_image(url: str, claimed_size: int | None) -> tuple[str, bytes]:
                 if len(data) > MAX_IMAGE_BYTES:
                     raise ValueError("Image too large")
     return _image_mime(data), bytes(data)
+
+
+def read_image_file(path: str, claimed_size: int | None) -> tuple[str, bytes]:
+    """Read one bounded regular file returned by the authenticated NapCat connection."""
+    if not os.path.isabs(path) or claimed_size is not None and claimed_size > MAX_IMAGE_BYTES:
+        raise ValueError("Invalid image file")
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    with os.fdopen(fd, "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise ValueError("Invalid image file")
+        data = stream.read(MAX_IMAGE_BYTES + 1)
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ValueError("Image too large")
+    return _image_mime(data), data

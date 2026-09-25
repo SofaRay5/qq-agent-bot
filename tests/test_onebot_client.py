@@ -261,3 +261,17 @@ async def test_send_helpers_ignore_invalid_message_ids(
 
     assert await client.send_private_message(111, "你好") is None
     assert await client.send_group_message(999, "你好") is None
+
+
+async def test_get_image_file_uses_onebot_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = OneBotClient("ws://127.0.0.1:3001/", "test-token")
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    async def call_action(action: str, params: dict[str, object]) -> dict[str, object]:
+        calls.append((action, params))
+        return {"status": "ok", "retcode": 0, "data": {"file": "/tmp/cached.jpg"}}
+
+    monkeypatch.setattr(client, "call_action", call_action)
+
+    assert await client.get_image_file("cached.jpg") == "/tmp/cached.jpg"
+    assert calls == [("get_image", {"file": "cached.jpg"})]

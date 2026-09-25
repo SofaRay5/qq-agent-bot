@@ -8,6 +8,7 @@ import pytest
 
 import core.groupmate as groupmate_module
 from agent.groupmate import BudgetExceeded, GroupmateReply, HistoryMessage, ReplyMode
+from agent.image_fetch import ImageDownloadError
 from agent.vision import VisionDescriber
 from config.models import Settings
 from core.groupmate import GroupmateCoordinator
@@ -168,6 +169,9 @@ class FakeVision:
             raise response
         return response
 
+    async def describe_file(self, path: str, size: int | None) -> str:
+        return await self(path, size)
+
 
 class Clock:
     def __init__(self) -> None:
@@ -205,6 +209,7 @@ def coordinator(
     clock: Clock | None = None,
     random_value: Callable[[], float] = lambda: 0.0,
     sleep: Callable[[float], Awaitable[None]] | None = None,
+    resolve_image: Callable[[str], Awaitable[str]] | None = None,
 ) -> GroupmateCoordinator:
     active_clock = clock or Clock()
     return GroupmateCoordinator(
@@ -212,10 +217,35 @@ def coordinator(
         "小薯",
         cast(GroupmateReply, reply),
         cast(VisionDescriber | None, vision),
+        resolve_image=resolve_image,
         now=active_clock.now,
         random_value=random_value,
         sleep=sleep or active_clock.sleep,
     )
+
+
+@pytest.mark.asyncio
+async def test_failed_image_url_falls_back_to_napcat_cache() -> None:
+    vision = FakeVision([ImageDownloadError(), "一份薯条"])
+    resolved: list[str] = []
+
+    async def resolve_image(file: str) -> str:
+        resolved.append(file)
+        return "/tmp/cached.jpg"
+
+    bot = coordinator(FakeReply(["这是薯条"]), vision=vision, resolve_image=resolve_image)
+    event = private_event("", image=True)
+    event.message[0]["data"]["file"] = "cached.jpg"
+    send = SendRecorder()
+
+    await bot.handle(event, send)
+
+    assert resolved == ["cached.jpg"]
+    assert vision.calls == [
+        ("https://qpic.cn/image", 42),
+        ("/tmp/cached.jpg", 42),
+    ]
+    assert send.messages == ["这是薯条"]
 
 
 @pytest.mark.asyncio
@@ -613,5 +643,24 @@ async def test_failure_logs_only_error_class_and_session_type(
 
     assert "RuntimeError" in caplog.text
     assert "private" in caplog.text
+    assert "stage=reply" in caplog.text
     assert private_body not in caplog.text
+    assert provider_detail not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_vision_failure_log_identifies_stage_without_details(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    provider_detail = "不应进入日志的识图错误详情"
+    bot = coordinator(
+        FakeReply(),
+        vision=FakeVision([ValueError(provider_detail)]),
+    )
+
+    with caplog.at_level(logging.ERROR, logger="core.groupmate"):
+        await bot.handle(private_event("", image=True), SendRecorder())
+
+    assert "ValueError" in caplog.text
+    assert "stage=vision" in caplog.text
     assert provider_detail not in caplog.text

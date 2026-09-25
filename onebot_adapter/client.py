@@ -121,6 +121,15 @@ class OneBotClient:
         )
         return _message_id(result)
 
+    async def get_image_file(self, file: str) -> str:
+        """Ask NapCat to materialize one received image in its local cache."""
+        result = await self.call_action("get_image", {"file": file})
+        data = result.get("data")
+        path = data.get("file") if isinstance(data, dict) else None
+        if not isinstance(path, str) or not path:
+            raise OneBotActionError("NapCat returned no image file")
+        return path
+
 
 def _message_id(result: dict[str, object]) -> int | None:
     data = result.get("data")

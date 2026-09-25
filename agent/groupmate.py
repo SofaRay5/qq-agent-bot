@@ -80,8 +80,21 @@ class GroupmateReply:
         budget_result: BudgetResult = await self._budget.reserve(budget_kind)
         if budget_result != "ok":
             raise BudgetExceeded(budget_result)
-        result = await self._model.ainvoke(self._messages(history, current, mode))
+        messages = self._messages(history, current, mode)
+        result = await self._model.ainvoke(messages)
+        if isinstance(result.content, str) and not result.content.strip():
+            result = await self._model.ainvoke(
+                [
+                    *messages,
+                    result,
+                    HumanMessage(content="上一次只返回了空白。现在立即输出一个非空 JSON 对象。"),
+                ]
+            )
         if not isinstance(result.content, str):
+            logger.error(
+                "invalid groupmate reply: reason=content_type type=%s",
+                type(result.content).__name__,
+            )
             raise ValueError("Invalid groupmate reply")
         payload = None
         try:
@@ -112,8 +125,21 @@ class GroupmateReply:
             or set(payload) != {"action", "text"}
             or payload["action"] != "reply"
         ):
+            action = payload.get("action") if isinstance(payload, dict) else None
+            logger.error(
+                "invalid groupmate reply: reason=protocol payload_type=%s keys_match=%s action=%s",
+                type(payload).__name__,
+                isinstance(payload, dict) and set(payload) == {"action", "text"},
+                action if action in {"reply", "silent"} else "other",
+            )
             raise ValueError("Invalid groupmate reply")
         text = payload["text"]
         if not isinstance(text, str) or not text.strip() or len(text) > 1000:
+            logger.error(
+                "invalid groupmate reply: reason=text type=%s empty=%s length=%d",
+                type(text).__name__,
+                isinstance(text, str) and not text.strip(),
+                len(text) if isinstance(text, str) else 0,
+            )
             raise ValueError("Invalid groupmate reply")
         return text.strip()

@@ -34,6 +34,16 @@ class FakeModel:
         return AIMessage(content=self.content)
 
 
+class FakeSequenceModel(FakeModel):
+    def __init__(self, contents: list[str]) -> None:
+        super().__init__("")
+        self.contents = iter(contents)
+
+    async def ainvoke(self, messages: list[BaseMessage]) -> AIMessage:
+        self.calls.append(messages)
+        return AIMessage(content=next(self.contents))
+
+
 @pytest.fixture
 def persona() -> Persona:
     return Persona.model_validate(
@@ -127,6 +137,21 @@ async def test_accepts_exact_silent_response(
     assert await reply([], "普通群消息", "continue", "chat") is None
 
 
+@pytest.mark.asyncio
+async def test_retries_one_empty_json_response(
+    monkeypatch: pytest.MonkeyPatch,
+    persona: Persona,
+) -> None:
+    model = FakeSequenceModel([" \n\t", '{"action":"reply","text":"重试成功"}'])
+    budget = FakeBudget()
+    reply, _ = build_reply(monkeypatch, persona, model, budget)
+
+    assert await reply([], "你好", "direct", "chat") == "重试成功"
+    assert budget.calls == ["chat"]
+    assert len(model.calls) == 2
+    assert "JSON" in str(model.calls[1][-1].content)
+
+
 @pytest.mark.parametrize(
     "content",
     [
@@ -171,6 +196,29 @@ async def test_invalid_json_logs_only_safe_shape_metadata(
     assert secret_output not in caplog.text
     assert "private-message-body" not in caplog.text
     assert caught.value.__context__ is None
+
+
+@pytest.mark.asyncio
+async def test_valid_json_protocol_error_logs_only_safe_reason(
+    monkeypatch: pytest.MonkeyPatch,
+    persona: Persona,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    secret_output = "sensitive-valid-json-output"
+    reply, _ = build_reply(
+        monkeypatch,
+        persona,
+        FakeModel(f'{{"action":"other","text":"{secret_output}"}}'),
+        FakeBudget(),
+    )
+
+    with caplog.at_level(logging.ERROR, logger="agent.groupmate"):
+        with pytest.raises(ValueError, match="Invalid groupmate reply"):
+            await reply([], "private-message-body", "direct", "chat")
+
+    assert "reason=protocol" in caplog.text
+    assert secret_output not in caplog.text
+    assert "private-message-body" not in caplog.text
 
 
 @pytest.mark.asyncio

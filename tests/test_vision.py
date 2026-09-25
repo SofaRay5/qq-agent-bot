@@ -1,3 +1,5 @@
+import logging
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -6,6 +8,7 @@ from pydantic import SecretStr
 
 import agent.vision as vision_module
 from agent.groupmate import BudgetExceeded
+from agent.image_fetch import ImageDownloadError
 from agent.vision import VisionDescriber
 from core.budget import BudgetResult, DailyBudget
 
@@ -81,8 +84,25 @@ async def test_vision_describer_returns_caption_without_chat_call(
 
 
 @pytest.mark.asyncio
+async def test_vision_describer_reads_napcat_cached_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "cached.png"
+    path.write_bytes(PNG)
+    model = FakeVisionModel("一份薯条")
+    monkeypatch.setattr(vision_module, "ChatOpenAI", lambda **_kwargs: model)
+    describer = VisionDescriber(
+        "key", "model", "https://vision.example/v1", cast(DailyBudget, FakeBudget())
+    )
+
+    assert await describer.describe_file(str(path), len(PNG)) == "一份薯条"
+
+
+@pytest.mark.asyncio
 async def test_vision_download_failure_does_not_reserve(
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     model = FakeVisionModel()
     budget = FakeBudget()
@@ -96,9 +116,12 @@ async def test_vision_download_failure_does_not_reserve(
         "key", "model", "https://vision.example/v1", cast(DailyBudget, budget)
     )
 
-    with pytest.raises(ValueError, match="download failed"):
-        await describer("https://multimedia.nt.qq.com.cn/image", None)
+    with caplog.at_level(logging.ERROR, logger="agent.vision"):
+        with pytest.raises(ImageDownloadError, match="Image download failed"):
+            await describer("https://multimedia.nt.qq.com.cn/image", None)
 
+    assert "stage=download" in caplog.text
+    assert "download failed" not in caplog.text
     assert budget.calls == []
     assert model.calls == []
 
@@ -157,3 +180,49 @@ async def test_vision_describer_rejects_empty_or_non_text_caption(
 
     with pytest.raises(ValueError, match="Empty vision description"):
         await describer("https://multimedia.nt.qq.com.cn/image", None)
+
+
+@pytest.mark.asyncio
+async def test_invalid_vision_response_logs_only_safe_shape_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    secret_output = "sensitive-vision-output"
+    model = FakeVisionModel([{"type": "text", "text": secret_output}])
+    monkeypatch.setattr(vision_module, "ChatOpenAI", lambda **_kwargs: model)
+    monkeypatch.setattr(vision_module, "fetch_image", fake_fetch)
+    describer = VisionDescriber(
+        "key", "model", "https://vision.example/v1", cast(DailyBudget, FakeBudget())
+    )
+
+    with caplog.at_level(logging.ERROR, logger="agent.vision"):
+        with pytest.raises(ValueError, match="Empty vision description"):
+            await describer("https://multimedia.nt.qq.com.cn/image", None)
+
+    assert "content_type=list" in caplog.text
+    assert secret_output not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_provider_body_error_logs_only_safe_code_and_type(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    secret_output = "sensitive-provider-message"
+    error = ValueError(
+        {"code": "vision_error", "type": "invalid_request_error", "message": secret_output}
+    )
+    model = FakeVisionModel(error=error)
+    monkeypatch.setattr(vision_module, "ChatOpenAI", lambda **_kwargs: model)
+    monkeypatch.setattr(vision_module, "fetch_image", fake_fetch)
+    describer = VisionDescriber(
+        "key", "model", "https://vision.example/v1", cast(DailyBudget, FakeBudget())
+    )
+
+    with caplog.at_level(logging.ERROR, logger="agent.vision"):
+        with pytest.raises(ValueError):
+            await describer("https://multimedia.nt.qq.com.cn/image", None)
+
+    assert "code=vision_error" in caplog.text
+    assert "type=invalid_request_error" in caplog.text
+    assert secret_output not in caplog.text

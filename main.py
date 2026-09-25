@@ -72,13 +72,19 @@ async def run() -> None:
     settings = load_settings(ROOT)
     persona = load_persona(ROOT)
     budget = DailyBudget(settings, ROOT / "data" / "model_usage.db")
+    client = OneBotClient(ws_url, token)
     reply = GroupmateReply(persona, api_key, budget)
     vision = None
     if vision_settings is not None:
         vision_key, vision_model, vision_url = vision_settings
         vision = VisionDescriber(vision_key, vision_model, vision_url, budget)
-    coordinator = GroupmateCoordinator(settings, persona.name, reply, vision)
-    client = OneBotClient(ws_url, token)
+    coordinator = GroupmateCoordinator(
+        settings,
+        persona.name,
+        reply,
+        vision,
+        resolve_image=client.get_image_file if vision is not None else None,
+    )
     dispatcher = Dispatcher(client, coordinator)
     try:
         await client.run(dispatcher.handle_event)
