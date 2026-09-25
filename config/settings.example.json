@@ -1,0 +1,14 @@
+{
+  "continuous_window_seconds": 600,
+  "window_max_attempts": 5,
+  "window_max_replies": 5,
+  "daily_model_calls": 50,
+  "daily_proactive_calls": 5,
+  "daily_vision_calls": 5,
+  "proactive_mode": "off",
+  "proactive_probability": 0.05,
+  "minimum_reply_interval_seconds": 8,
+  "send_delay_seconds": 1.5,
+  "context_max_messages": 20,
+  "context_max_characters": 6000
+}

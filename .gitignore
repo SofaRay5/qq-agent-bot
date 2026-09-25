@@ -5,3 +5,5 @@ data/
 .env
 .idea/
 *.log
+/config/settings.json
+/config/persona.json
