@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-NapCat echo 闭环和 DeepSeek 回复均已完成本地自动化与真实 QQ 验收。具体 Task/Step 勾选以 [实施计划](superpowers/plans/2026-09-23-qq-bot-mvp.md)为准。
+NapCat echo 闭环和 DeepSeek 回复均已完成本地自动化与真实 QQ 验收。Task 7 识图已完成代码和假服务检查，等待真实 NapCat 与视觉模型验收。本文件保留 MVP 验收记录；Task 1–11 的最新进度见 [任务Checklist](任务Checklist.md)，MVP 细步骤见 [原实施计划](superpowers/plans/2026-09-23-qq-bot-mvp.md)。
 
 ## 1. 环境可复现
 
@@ -34,10 +34,8 @@ NapCat echo 闭环和 DeepSeek 回复均已完成本地自动化与真实 QQ 验
 
 真实 DeepSeek 验收记录（2026-09-24，用户手动验证）：Task 6 测试指南中的自动化检查、私聊回复、群聊触发规则和停止行为均无问题。密钥未记录在仓库。
 
-## 4. 按需求增强
+## 4. 已确定的扩展顺序
 
-- [ ] 多轮上下文：需要跨轮对话时再接入 LangGraph checkpointer，并测试群、私聊隔离和重启持久化。
-- [ ] 用户画像、记忆提取、工具、限流和中间件：出现明确使用场景后逐项加入，不提前搭空框架。
-- [ ] 部署与 CI：准备持续运行或协作开发时，再补容器、监控和自动检查。
+识图（默认关闭）→ 群友行为与人格 → 本地浏览器后台 → SQLite 记忆 → 服务器持续运行。范围和边界见 [已批准的扩展设计](superpowers/specs/2026-09-24-ai-groupmate-expansion-design.md)，每项子任务的勾选以 [任务Checklist](任务Checklist.md)为准。工具调用和 CI 没有排入当前任务。
 
-每次只推进 [实施计划](superpowers/plans/2026-09-23-qq-bot-mvp.md)中的一个任务，完成后等待用户明确说“下一个任务开始”；不自动提交、推送或部署。真实 NapCat 和 LLM 验收须实际运行后才标记完成。历史学习版清单见 [archive/里程碑Checklist-学习版.md](archive/里程碑Checklist-学习版.md)。
+每次只推进一个任务，完成后等待用户明确说“下一个任务开始”；完成并验证合适的阶段后可自主提交，但不自动推送或部署。真实 NapCat 和 LLM 验收须实际运行后才标记完成。历史学习版清单见 [archive/里程碑Checklist-学习版.md](archive/里程碑Checklist-学习版.md)。

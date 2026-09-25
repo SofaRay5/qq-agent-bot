@@ -4,14 +4,18 @@
 
 ## 规划与架构
 
+- [任务Checklist.md](任务Checklist.md) — Task 1–11 的总打勾进度；完成一个子项就更新一个勾。
 - [里程碑Checklist.md](里程碑Checklist.md) — 当前阶段和真实 QQ 验收记录。
 - [superpowers/specs/2026-09-23-qq-bot-mvp-design.md](superpowers/specs/2026-09-23-qq-bot-mvp-design.md) — 已批准的 echo 与单轮 LLM MVP 设计。
+- [superpowers/specs/2026-09-24-ai-groupmate-expansion-design.md](superpowers/specs/2026-09-24-ai-groupmate-expansion-design.md) — 已批准的 AI 群友扩展总设计与 Task 7–11 顺序。
 - [superpowers/plans/2026-09-23-qq-bot-mvp.md](superpowers/plans/2026-09-23-qq-bot-mvp.md) — 逐任务实施计划和 Task/Step 勾选。
+- [superpowers/plans/2026-09-24-task7-image-understanding.md](superpowers/plans/2026-09-24-task7-image-understanding.md) — 已批准并执行的 Task 7 识图实施计划。
 - [QQ机器人工程化设计文档.md](QQ机器人工程化设计文档.md) — 长期目标架构的参考选项；MVP 不要求一次实现全部内容。
 
 ## 工程规范与流程
 
 - [Task6测试指南.md](Task6测试指南.md) — 使用启动窗口完成自动化、私聊、群聊和停止验收。
+- [Task7测试指南.md](Task7测试指南.md) — 验证默认关闭、真实识图、失败隔离和每日额度。
 - [CODING_STANDARDS.md](CODING_STANDARDS.md) — 编码规范：类型标注/docstring、异常处理、
   日志 vs print、模块跨层调用边界。
 - [DEV_WORKFLOW.md](DEV_WORKFLOW.md) — 日常开发流程速查：commit/push 步骤、commit

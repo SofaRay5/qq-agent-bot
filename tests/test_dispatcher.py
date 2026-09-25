@@ -6,7 +6,7 @@ import pytest
 from core.dispatcher import Dispatcher, echo_reply
 from onebot_adapter.client import OneBotClient
 from onebot_adapter.event import GroupMessageEvent, HeartbeatEvent, PrivateMessageEvent
-from onebot_adapter.message import text_for_reply
+from onebot_adapter.message import ImageRef, image_for_reply, text_for_reply
 
 
 class FakeClient:
@@ -37,6 +37,123 @@ def private_event(data: dict[str, Any]) -> PrivateMessageEvent:
 
 def group_event(data: dict[str, Any]) -> GroupMessageEvent:
     return GroupMessageEvent.model_validate(data)
+
+
+@pytest.mark.parametrize(
+    ("segments", "expected"),
+    [
+        (
+            [{"type": "image", "data": {"url": "https://qpic.cn/first", "file_size": "42"}}],
+            ImageRef("https://qpic.cn/first", 42),
+        ),
+        (
+            [
+                {"type": "text", "data": {"text": "看看"}},
+                {"type": "image", "data": {"url": "https://qpic.cn/image", "file_size": 7}},
+            ],
+            ImageRef("https://qpic.cn/image", 7),
+        ),
+        ([{"type": "image", "data": "bad"}], ImageRef("", None)),
+        (
+            [{"type": "image", "data": {"url": "https://qpic.cn/image", "file_size": "²"}}],
+            ImageRef("https://qpic.cn/image", None),
+        ),
+        (
+            [
+                {
+                    "type": "image",
+                    "data": {"url": "https://qpic.cn/image", "file_size": "1" * 5000},
+                }
+            ],
+            ImageRef("https://qpic.cn/image", None),
+        ),
+        (
+            [
+                {"type": "image", "data": {"type": "flash", "url": "https://qpic.cn/flash"}},
+                {"type": "image", "data": {"url": "https://qpic.cn/ordinary", "file_size": "bad"}},
+                {"type": "image", "data": {"url": "https://qpic.cn/second"}},
+            ],
+            ImageRef("https://qpic.cn/ordinary", None),
+        ),
+    ],
+)
+def test_private_selects_first_ordinary_image(
+    private_message_json: dict[str, Any],
+    segments: list[dict[str, Any]],
+    expected: ImageRef,
+) -> None:
+    private_message_json["message"] = segments
+    assert image_for_reply(private_event(private_message_json)) == expected
+
+
+def test_group_image_must_follow_bot_mention(group_message_json: dict[str, Any]) -> None:
+    after = "https://multimedia.nt.qq.com.cn/after"
+    group_message_json["message"] = [
+        {"type": "image", "data": {"url": "https://qpic.cn/before"}},
+        {"type": "at", "data": {"qq": "123456"}},
+        {"type": "image", "data": {"url": after, "file_size": "42"}},
+    ]
+    assert image_for_reply(group_event(group_message_json)) == ImageRef(after, 42)
+
+    group_message_json["message"] = [{"type": "image", "data": {"url": after}}]
+    assert image_for_reply(group_event(group_message_json)) is None
+
+
+@pytest.mark.asyncio
+async def test_image_only_reports_vision_disabled(
+    private_message_json: dict[str, Any], group_message_json: dict[str, Any]
+) -> None:
+    image = {"type": "image", "data": {"url": "https://qpic.cn/image"}}
+    private_message_json["message"] = [image]
+    group_message_json["message"] = [
+        {"type": "at", "data": {"qq": "123456"}},
+        image,
+    ]
+    client = FakeClient()
+    dispatcher = Dispatcher(cast(OneBotClient, client), echo_reply)
+    dispatcher.handle_event(private_event(private_message_json))
+    dispatcher.handle_event(group_event(group_message_json))
+    await settle(dispatcher)
+    assert client.private == [(111, "识图尚未开启")]
+    assert client.group == [(999, "识图尚未开启")]
+
+
+@pytest.mark.asyncio
+async def test_image_uses_vision_reply_with_optional_text(
+    private_message_json: dict[str, Any],
+) -> None:
+    calls: list[tuple[str, str, int | None]] = []
+
+    async def vision_reply(text: str, url: str, size: int | None) -> str:
+        calls.append((text, url, size))
+        return "看到了"
+
+    private_message_json["message"] = [
+        {"type": "text", "data": {"text": " 这是什么？ "}},
+        {"type": "image", "data": {"url": "https://qpic.cn/image", "file_size": "42"}},
+    ]
+    client = FakeClient()
+    dispatcher = Dispatcher(cast(OneBotClient, client), echo_reply, vision_reply=vision_reply)
+    dispatcher.handle_event(private_event(private_message_json))
+    await settle(dispatcher)
+    assert calls == [("这是什么？", "https://qpic.cn/image", 42)]
+    assert client.private == [(111, "看到了")]
+
+
+@pytest.mark.asyncio
+async def test_image_only_passes_empty_text_to_vision(private_message_json: dict[str, Any]) -> None:
+    calls: list[tuple[str, str, int | None]] = []
+
+    async def vision_reply(text: str, url: str, size: int | None) -> str:
+        calls.append((text, url, size))
+        return "图片"
+
+    private_message_json["message"] = [{"type": "image", "data": {"url": "https://qpic.cn/image"}}]
+    client = FakeClient()
+    dispatcher = Dispatcher(cast(OneBotClient, client), echo_reply, vision_reply=vision_reply)
+    dispatcher.handle_event(private_event(private_message_json))
+    await settle(dispatcher)
+    assert calls == [("", "https://qpic.cn/image", None)]
 
 
 @pytest.mark.asyncio

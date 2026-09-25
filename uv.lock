@@ -957,6 +957,8 @@ name = "qq-agent-bot"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "httpcore" },
+    { name = "httpx" },
     { name = "langchain-openai" },
     { name = "pydantic" },
     { name = "websockets" },
@@ -973,6 +975,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpcore", specifier = ">=1.0.9" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "langchain-openai", specifier = ">=1.6.5" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "websockets", specifier = ">=17.1" },

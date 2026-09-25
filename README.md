@@ -21,13 +21,27 @@ uv run python scripts/start_ui.py
 
 在窗口中填写 WebSocket 地址、Token 和 API Key，点击“启动”；点击“停止”或关闭窗口会结束机器人进程。密钥输入框会隐藏文字，启动后清空，关闭窗口后不会保存。窗口显示的是进程状态；是否已连上 NapCat，请用 QQ 消息验证。启动错误的详情会显示在运行该命令的终端中。
 
-当前只处理单轮纯文本；不会记住前文，也不会处理图片或工具调用。模型超时或返回空内容时，机器人发送“暂时无法回复，请稍后再试”。
+当前是单轮回复，不会记住前文或调用工具。识图默认关闭；私聊图片或群内 @ 后的图片会收到“识图尚未开启”，普通文字仍按原方式回复。
+
+如需测试识图，先在当前终端设置以下变量，再运行启动脚本：
+
+```bash
+export VISION_ENABLED=1
+export VISION_API_BASE_URL='https://你的视觉服务地址/v1'
+export VISION_MODEL='支持图片输入的模型名'
+read -r -s VISION_API_KEY && export VISION_API_KEY
+bash scripts/start_echo.sh
+```
+
+视觉接口须兼容 OpenAI 图片消息格式。每条消息最多处理第一张普通图片，每个本地日最多尝试视觉 API 5 次；计数保存在 Git 忽略的 `data/vision_usage.db`，服务商调用失败也计数。图片下载或模型调用失败时只发送一次“暂时无法回复，请稍后再试”，后续文字消息仍可继续使用。完整步骤见 [Task 7 测试指南](docs/Task7测试指南.md)。
 
 ## 开发进度
 
-Task 1–6 已完成，NapCat echo 与 DeepSeek 回复均通过本地自动化和真实 QQ 验收。每次只做一个任务，未获明确要求时不提交、推送或部署。
+Task 1–6 已完成，NapCat echo 与 DeepSeek 回复均通过本地自动化和真实 QQ 验收。Task 7 代码与假服务测试已完成，等待真实 NapCat + 视觉模型验收。每次只做一个任务；完成并验证合适的阶段后可自主提交，但不自动推送或部署。
 
 - [文档索引](docs/README.md)
 - [Task 6 测试指南](docs/Task6测试指南.md)
+- [Task 7 测试指南](docs/Task7测试指南.md)
 - [路线图与验收记录](docs/里程碑Checklist.md)
+- [任务总打勾清单](docs/任务Checklist.md)
 - [Superpowers 实施计划与 Task 勾选](docs/superpowers/plans/2026-09-23-qq-bot-mvp.md)
