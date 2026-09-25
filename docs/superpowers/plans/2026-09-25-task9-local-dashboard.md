@@ -263,7 +263,7 @@ git commit -m "feat: manage bot runtime lifecycle"
 - Consumes: Task 9.1 `atomic_write_json`.
 - Produces: `AuthStore`, `SessionStore`, `Session`, constant-time password/CSRF checks, and in-memory failed-login tracking consumed by Task 9.5.
 
-- [ ] **Step 1: Write failing password-store tests.**
+- [x] **Step 1: Write failing password-store tests.**
 
 Assert a 10–128 character password creates `data/admin_auth.json` with mode `0o600`, random salt and scrypt hash but no plaintext. Assert correct verification, incorrect verification, distinct salts, and safe rejection of short/long passwords. A missing file means setup is allowed; malformed or structurally invalid existing files raise `ValueError` and never act as missing.
 
@@ -271,11 +271,11 @@ Run: `uv run pytest tests/test_dashboard_auth.py -q`
 
 Expected: FAIL because `AuthStore` does not exist.
 
-- [ ] **Step 2: Implement the owner password store.**
+- [x] **Step 2: Implement the owner password store.**
 
 Use `secrets.token_bytes`, `hashlib.scrypt`, `hmac.compare_digest` and Task 9.1 `atomic_write_json`. Store only version, salt and derived hash.
 
-- [ ] **Step 3: Write failing session and CSRF tests.**
+- [x] **Step 3: Write failing session and CSRF tests.**
 
 Assert login creates a new random session ID and separate CSRF token, session IDs rotate on every login, logout invalidates the session, and wrong/missing CSRF fails in constant-time comparison. Assert the store never serializes sessions to disk.
 
@@ -283,11 +283,11 @@ Run: `uv run pytest tests/test_dashboard_auth.py -q`
 
 Expected: FAIL because session support does not exist.
 
-- [ ] **Step 4: Implement in-memory sessions and bounded failure delay.**
+- [x] **Step 4: Implement in-memory sessions and bounded failure delay.**
 
 Expose only creation, lookup, CSRF verification and deletion. Track one process-local consecutive-failure count capped at a three-second delay; successful login resets it. Do not add users, roles, refresh tokens or a session database.
 
-- [ ] **Step 5: Verify and commit Task 9.4.**
+- [x] **Step 5: Verify and commit Task 9.4.**
 
 Run: `uv run pytest tests/test_dashboard_auth.py -q`
 
