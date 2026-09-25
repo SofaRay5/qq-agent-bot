@@ -499,9 +499,7 @@ async def test_runtime_swap_finishes_old_request_then_preserves_history() -> Non
 
     first = asyncio.create_task(bot.handle(private_event("第一条", message_id=1), send))
     await old_reply.started.wait()
-    bot.replace_runtime(
-        GroupmateRuntime(settings(), "小薯", cast(GroupmateReply, new_reply), None)
-    )
+    bot.replace_runtime(GroupmateRuntime(settings(), "小薯", cast(GroupmateReply, new_reply), None))
     old_reply.release.set()
     await first
     await bot.handle(private_event("第二条", message_id=2), send)

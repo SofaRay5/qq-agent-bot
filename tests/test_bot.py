@@ -62,9 +62,7 @@ def set_base_config(monkeypatch: pytest.MonkeyPatch) -> None:
 class FakeReply:
     instances: list["FakeReply"] = []
 
-    def __init__(
-        self, persona: Persona, provider: ProviderSettings, _budget: object
-    ) -> None:
+    def __init__(self, persona: Persona, provider: ProviderSettings, _budget: object) -> None:
         assert persona.name == "小薯"
         assert provider == ProviderSettings(
             provider="deepseek",

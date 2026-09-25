@@ -6,6 +6,19 @@
 
 需要 Python 3.13+、`uv` 和已登录 QQ 的 NapCat。在 NapCat「网络配置」中启用 **WebSocket 服务端**，监听 `127.0.0.1:3001`，消息格式选 `array`，并设置 WebSocket Token。它与 NapCat WebUI 登录密钥不同。
 
+推荐使用本地浏览器后台启动：
+
+```bash
+uv sync
+bash scripts/start_dashboard.sh
+```
+
+首次打开 `http://127.0.0.1:8765/` 时创建管理密码。登录后在“模型与连接”填写 NapCat 地址、Token、DeepSeek 聊天模型和 API Key，再到“行为设置”和“人格”检查配置，最后在状态页点击“启动机器人”。后台只监听本机回环地址；浏览器关闭不会停止机器人，状态页的“停止机器人”或终端 `Ctrl+C` 会停止它。
+
+完整步骤和真实 Mac 验收见 [Task 9 测试指南](docs/Task9测试指南.md)。
+
+备用的文件和环境变量启动方式仍可用：
+
 ```bash
 uv sync
 cp config/settings.example.json config/settings.json
@@ -15,7 +28,7 @@ bash scripts/start_bot.sh
 
 `settings.json` 控制持续对话窗口、次数、每日调用额度、主动参与和回复节奏；`persona.json` 是角色卡，可按需填写。两份本地文件都被 Git 忽略。主动参与默认关闭。
 
-在窗口中填写 WebSocket 地址、NapCat Token 和 DeepSeek API Key，点击“启动”。WebSocket Token 与 NapCat WebUI 登录密钥不同。点击“停止”或关闭窗口会结束机器人进程；密钥输入框会隐藏文字，启动后清空，关闭窗口后不会保存。窗口显示进程状态，是否已连接 NapCat 请用 QQ 消息验证。启动错误详情会显示在打开窗口的终端中。
+Tkinter 启动窗口仍可通过 `uv run python scripts/start_ui.py` 使用。它只把密钥放入子进程环境，不写入配置文件；窗口关闭会结束机器人进程。WebSocket Token 与 NapCat WebUI 登录密钥不同。
 
 命令行备用启动方式为 `bash scripts/start_echo.sh`。
 

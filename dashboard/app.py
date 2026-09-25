@@ -61,7 +61,11 @@ class DashboardState:
         return session
 
 
-STATE = web.AppKey("dashboard_state", DashboardState)
+STATE: web.AppKey[DashboardState] = web.AppKey("dashboard_state", DashboardState)
+
+
+def _state(request: web.Request) -> DashboardState:
+    return cast(DashboardState, request.app[STATE])
 
 
 def _cookie(response: web.StreamResponse, session: Session) -> None:
@@ -69,12 +73,13 @@ def _cookie(response: web.StreamResponse, session: Session) -> None:
 
 
 def _session(request: web.Request) -> Session | None:
-    return request.app[STATE].sessions.get(request.cookies.get(COOKIE))
+    session_id = cast(str | None, request.cookies.get(COOKIE))
+    return _state(request).sessions.get(session_id)
 
 
 def _authenticated(request: web.Request) -> bool:
     session = _session(request)
-    state = request.app[STATE]
+    state = _state(request)
     return session is not None and session.session_id == state.authenticated_session_id
 
 
@@ -82,7 +87,7 @@ def _redirect(location: str) -> web.HTTPFound:
     return web.HTTPFound(location)
 
 
-@web.middleware
+@web.middleware  # type: ignore[misc]
 async def _errors(
     request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
 ) -> web.StreamResponse:
@@ -99,11 +104,11 @@ async def _errors(
         )
 
 
-@web.middleware
+@web.middleware  # type: ignore[misc]
 async def _security(
     request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
 ) -> web.StreamResponse:
-    state = request.app[STATE]
+    state = _state(request)
     if request.method == "POST":
         form = await request.post()
         csrf_value = form.get("csrf_token")
@@ -119,7 +124,7 @@ async def _security(
 
 
 async def _setup_get(request: web.Request) -> web.Response:
-    state = request.app[STATE]
+    state = _state(request)
     if not state.auth.needs_setup():
         raise _redirect("/login")
     session = state.new_session()
@@ -132,7 +137,7 @@ async def _setup_get(request: web.Request) -> web.Response:
 
 
 async def _setup_post(request: web.Request) -> web.Response:
-    state = request.app[STATE]
+    state = _state(request)
     if not state.auth.needs_setup():
         raise _redirect("/login")
     form = await request.post()
@@ -155,7 +160,7 @@ async def _setup_post(request: web.Request) -> web.Response:
 
 
 async def _login_get(request: web.Request) -> web.Response:
-    state = request.app[STATE]
+    state = _state(request)
     if state.auth.needs_setup():
         raise _redirect("/setup")
     session = state.new_session()
@@ -168,7 +173,7 @@ async def _login_get(request: web.Request) -> web.Response:
 
 
 async def _login_post(request: web.Request) -> web.Response:
-    state = request.app[STATE]
+    state = _state(request)
     form = await request.post()
     if not state.auth.verify_password(str(form.get("password", ""))):
         await asyncio.sleep(state.throttle.record_failure())
@@ -187,7 +192,7 @@ async def _login_post(request: web.Request) -> web.Response:
 
 
 async def _logout(request: web.Request) -> web.Response:
-    state = request.app[STATE]
+    state = _state(request)
     state.sessions.delete(request.cookies.get(COOKIE))
     state.authenticated_session_id = None
     response = web.Response(status=302, headers={"Location": "/login"})
@@ -204,7 +209,7 @@ async def _status_response(
 ) -> web.Response:
     session = _session(request)
     assert session is not None
-    state = request.app[STATE]
+    state = _state(request)
     error = ""
     private: PrivateSettings | None = None
     settings: Settings | None = None
@@ -229,9 +234,12 @@ async def _status_response(
             f"{max(0, settings.daily_vision_calls - usage.vision)}"
         )
     disabled = " disabled" if error or state.manager.state != "stopped" else ""
-    errors = "".join(
-        f"<li>{escape(item.time)} {escape(item.category)}</li>" for item in state.manager.errors
-    ) or "<li>无</li>"
+    errors = (
+        "".join(
+            f"<li>{escape(item.time)} {escape(item.category)}</li>" for item in state.manager.errors
+        )
+        or "<li>无</li>"
+    )
     body = (
         navigation(session.csrf_token)
         + "<h1>状态</h1>"
@@ -250,7 +258,7 @@ async def _status_response(
 
 
 async def _start(request: web.Request) -> web.Response:
-    state = request.app[STATE]
+    state = _state(request)
     try:
         private = load_private_settings(state.root)
         settings = load_settings(state.root)
@@ -263,7 +271,7 @@ async def _start(request: web.Request) -> web.Response:
 
 
 async def _stop(request: web.Request) -> web.Response:
-    await request.app[STATE].manager.stop()
+    await _state(request).manager.stop()
     return await _status_response(request, notice="停止请求已处理。")
 
 
@@ -338,9 +346,7 @@ def _settings_from_form(form: Mapping[str, object]) -> Settings:
         daily_vision_calls=int(str(form.get("daily_vision_calls", ""))),
         proactive_mode=str(form.get("proactive_mode", "")),  # type: ignore[arg-type]
         proactive_probability=float(str(form.get("proactive_probability", ""))),
-        minimum_reply_interval_seconds=float(
-            str(form.get("minimum_reply_interval_seconds", ""))
-        ),
+        minimum_reply_interval_seconds=float(str(form.get("minimum_reply_interval_seconds", ""))),
         send_delay_seconds=float(str(form.get("send_delay_seconds", ""))),
         context_max_messages=int(str(form.get("context_max_messages", ""))),
         context_max_characters=int(str(form.get("context_max_characters", ""))),
@@ -348,7 +354,7 @@ def _settings_from_form(form: Mapping[str, object]) -> Settings:
 
 
 async def _settings_get(request: web.Request) -> web.Response:
-    fields = _settings_fields(load_settings(request.app[STATE].root))
+    fields = _settings_fields(load_settings(_state(request).root))
     return _form_response(request, "行为设置", "/settings", fields)
 
 
@@ -356,7 +362,7 @@ async def _settings_post(request: web.Request) -> web.Response:
     form = await request.post()
     try:
         value = _settings_from_form(form)
-        state = request.app[STATE]
+        state = _state(request)
         save_settings(state.root, value)
         state.manager.update_runtime(
             load_private_settings(state.root), value, load_persona(state.root)
@@ -397,9 +403,7 @@ def _models_fields(value: PrivateSettings) -> str:
     )
 
 
-def _models_fields_from_form(
-    form: Mapping[str, object], current: PrivateSettings
-) -> str:
+def _models_fields_from_form(form: Mapping[str, object], current: PrivateSettings) -> str:
     def value(name: str, fallback: str) -> str:
         return str(form.get(name, fallback))
 
@@ -458,21 +462,19 @@ def _provider(
 
 
 async def _models_get(request: web.Request) -> web.Response:
-    value = load_private_settings(request.app[STATE].root)
+    value = load_private_settings(_state(request).root)
     return _form_response(request, "模型与连接", "/models", _models_fields(value))
 
 
 async def _models_post(request: web.Request) -> web.Response:
-    state = request.app[STATE]
+    state = _state(request)
     form = await request.post()
     current: PrivateSettings | None = None
     try:
         current = load_private_settings(state.root)
         value = PrivateSettings(
             napcat_ws_url=str(form.get("napcat_ws_url", "")),
-            napcat_access_token=_secret(
-                form, "napcat_access_token", current.napcat_access_token
-            ),
+            napcat_access_token=_secret(form, "napcat_access_token", current.napcat_access_token),
             chat=_provider(form, "chat", current.chat),
             vision_enabled=form.get("vision_enabled") == "on",
             vision=_provider(form, "vision", current.vision),
@@ -485,16 +487,12 @@ async def _models_post(request: web.Request) -> web.Response:
         state.manager.update_runtime(value, load_settings(state.root), load_persona(state.root))
     except OSError:
         fields = _models_fields(current) if current is not None else ""
-        response = _form_response(
-            request, "模型与连接", "/models", fields, "保存失败，请稍后重试"
-        )
+        response = _form_response(request, "模型与连接", "/models", fields, "保存失败，请稍后重试")
         response.set_status(500)
         return response
     except (ValueError, ValidationError):
         fields = _models_fields_from_form(form, current) if current is not None else ""
-        return _form_response(
-            request, "模型与连接", "/models", fields, "设置无效，请检查字段"
-        )
+        return _form_response(request, "模型与连接", "/models", fields, "设置无效，请检查字段")
     notice = "<p class=notice>NapCat 设置已变更，请重启机器人。</p>" if restart else ""
     return _form_response(request, "模型与连接", "/models", notice + _models_fields(value))
 
@@ -563,12 +561,12 @@ def _persona_from_form(form: Mapping[str, object]) -> Persona:
 
 
 async def _persona_get(request: web.Request) -> web.Response:
-    value = load_persona(request.app[STATE].root)
+    value = load_persona(_state(request).root)
     return _form_response(request, "人格", "/persona", _persona_fields(value))
 
 
 async def _persona_post(request: web.Request) -> web.Response:
-    state = request.app[STATE]
+    state = _state(request)
     form = await request.post()
     try:
         value = _persona_from_form(form)

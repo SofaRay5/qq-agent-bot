@@ -1,11 +1,12 @@
 import re
+from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import cast
 
 import pytest
 from aiohttp import CookieJar
 from aiohttp.test_utils import TestClient, TestServer
 
-import config.storage as storage_module
 from config.models import (
     Persona,
     PrivateSettings,
@@ -22,7 +23,7 @@ from config.storage import (
 )
 from dashboard.app import create_app
 from dashboard.auth import AuthStore
-from dashboard.runtime import SafeError
+from dashboard.runtime import BotManager, SafeError
 
 
 class FakeManager:
@@ -50,7 +51,7 @@ def csrf(html: str) -> str:
 
 @pytest.fixture
 async def client(tmp_path: Path) -> TestClient:
-    app = create_app(tmp_path, FakeManager())
+    app = create_app(tmp_path, cast(BotManager, FakeManager()))
     async with TestClient(TestServer(app), cookie_jar=CookieJar(unsafe=True)) as value:
         yield value
 
@@ -76,18 +77,17 @@ async def test_first_run_setup_login_rotation_and_auth_guards(
     setup_cookie = response.headers.getall("Set-Cookie")[0]
     assert "HttpOnly" in setup_cookie
     assert "SameSite=Strict" in setup_cookie
-    assert client.session.cookie_jar.filter_cookies(client.make_url("/"))[
-        "dashboard_session"
-    ].value != old_cookie
+    assert (
+        client.session.cookie_jar.filter_cookies(client.make_url("/"))["dashboard_session"].value
+        != old_cookie
+    )
 
     response = await client.post("/logout", data={}, allow_redirects=False)
     assert response.status == 403
 
     status = await client.get("/")
     token = csrf(await status.text())
-    response = await client.post(
-        "/logout", data={"csrf_token": token}, allow_redirects=False
-    )
+    response = await client.post("/logout", data={"csrf_token": token}, allow_redirects=False)
     assert response.status == 302
 
     response = await client.get("/settings", allow_redirects=False)
@@ -104,9 +104,10 @@ async def test_first_run_setup_login_rotation_and_auth_guards(
         allow_redirects=False,
     )
     assert response.status == 302
-    assert client.session.cookie_jar.filter_cookies(client.make_url("/"))[
-        "dashboard_session"
-    ].value != anonymous_cookie
+    assert (
+        client.session.cookie_jar.filter_cookies(client.make_url("/"))["dashboard_session"].value
+        != anonymous_cookie
+    )
 
 
 async def test_post_requires_csrf_and_request_size_is_limited(client: TestClient) -> None:
@@ -115,9 +116,7 @@ async def test_post_requires_csrf_and_request_size_is_limited(client: TestClient
 
     assert (await client.post("/setup", data={"password": "long-enough-password"})).status == 403
     oversized = "x" * 70_000
-    response = await client.post(
-        "/setup", data={"password": oversized, "csrf_token": token}
-    )
+    response = await client.post("/setup", data={"password": oversized, "csrf_token": token})
     assert response.status == 413
 
 
@@ -173,13 +172,13 @@ def valid_private() -> PrivateSettings:
 @pytest.fixture
 async def authenticated(
     tmp_path: Path,
-) -> tuple[TestClient, FakeManager, Path]:
+) -> AsyncIterator[tuple[TestClient, FakeManager, Path]]:
     save_settings(tmp_path, valid_settings())
     save_persona(tmp_path, valid_persona())
     save_private_settings(tmp_path, valid_private())
     AuthStore(tmp_path).create_password("correct horse battery staple")
     manager = FakeManager()
-    app = create_app(tmp_path, manager)
+    app = create_app(tmp_path, cast(BotManager, manager))
     async with TestClient(TestServer(app), cookie_jar=CookieJar(unsafe=True)) as value:
         login = await value.get("/login")
         response = await value.post(
@@ -333,7 +332,7 @@ async def test_corrupt_private_config_keeps_status_safe_and_disables_start(
     private_path.parent.mkdir(exist_ok=True)
     private_path.write_text('{"leaked-marker":"secret-content"', encoding="utf-8")
     AuthStore(tmp_path).create_password("correct horse battery staple")
-    app = create_app(tmp_path, FakeManager())
+    app = create_app(tmp_path, cast(BotManager, FakeManager()))
     async with TestClient(TestServer(app), cookie_jar=CookieJar(unsafe=True)) as client:
         login = await client.get("/login")
         await client.post(
@@ -365,10 +364,8 @@ async def test_failed_atomic_save_keeps_secret_and_runtime_snapshot(
     def fail_replace(_source: object, _target: object) -> None:
         raise OSError("private path and secret must stay server-side")
 
-    monkeypatch.setattr(storage_module.os, "replace", fail_replace)
-    response = await client.post(
-        "/models", data=model_form(token, chat_api_key="new-secret-value")
-    )
+    monkeypatch.setattr("config.storage.os.replace", fail_replace)
+    response = await client.post("/models", data=model_form(token, chat_api_key="new-secret-value"))
     text = await response.text()
 
     assert response.status == 500
@@ -463,9 +460,7 @@ async def test_behavior_and_persona_forms_validate_save_and_keep_entered_values(
 
     persona_page = await client.get("/persona")
     persona_token = csrf(await persona_page.text())
-    response = await client.post(
-        "/persona", data=persona_form(persona_token, name="<b>新名字</b>")
-    )
+    response = await client.post("/persona", data=persona_form(persona_token, name="<b>新名字</b>"))
     assert response.status == 200
     assert load_persona(root).name == "<b>新名字</b>"
     assert "&lt;b&gt;新名字&lt;/b&gt;" in await response.text()

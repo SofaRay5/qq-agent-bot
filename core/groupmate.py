@@ -122,9 +122,7 @@ class GroupmateCoordinator:
     ) -> bool:
         if isinstance(event, PrivateMessageEvent):
             return True
-        named = content.text is not None and content.text.lstrip().startswith(
-            runtime.persona_name
-        )
+        named = content.text is not None and content.text.lstrip().startswith(runtime.persona_name)
         replied = content.reply_to is not None and content.reply_to in state.sent_message_ids
         return content.mentioned or named or replied
 
@@ -242,9 +240,7 @@ class GroupmateCoordinator:
         current = self._current(runtime, event, content)
         if state.last_sent_at is not None:
             remaining = (
-                state.last_sent_at
-                + runtime.settings.minimum_reply_interval_seconds
-                - self._now()
+                state.last_sent_at + runtime.settings.minimum_reply_interval_seconds - self._now()
             )
             if remaining > 0:
                 if explicit:

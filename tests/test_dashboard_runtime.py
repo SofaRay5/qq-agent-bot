@@ -93,7 +93,7 @@ async def test_concurrent_start_and_stop_create_and_close_one_service(tmp_path: 
     await asyncio.gather(manager.stop(), manager.stop())
 
     assert service.closed == 1
-    assert manager.state == "stopped"
+    assert str(manager.state) == "stopped"
 
 
 @pytest.mark.asyncio
@@ -107,7 +107,7 @@ async def test_connection_callback_and_runtime_update_use_running_service(tmp_pa
     service.on_state("connected")
     assert manager.state == "connected"
     service.on_state("reconnecting")
-    assert manager.state == "reconnecting"
+    assert str(manager.state) == "reconnecting"
 
     manager.update_runtime(private(), settings(), persona())
     assert len(service.updates) == 1

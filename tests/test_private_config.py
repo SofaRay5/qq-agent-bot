@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-import config.storage as storage_module
 from config.models import (
     Persona,
     PrivateSettings,
@@ -218,7 +217,7 @@ def test_failed_replace_preserves_previous_private_settings(
     def fail_replace(_source: os.PathLike[str], _target: os.PathLike[str]) -> None:
         raise OSError("replace failed")
 
-    monkeypatch.setattr(storage_module.os, "replace", fail_replace)
+    monkeypatch.setattr("config.storage.os.replace", fail_replace)
 
     with pytest.raises(OSError, match="replace failed"):
         save_private_settings(tmp_path, replacement)

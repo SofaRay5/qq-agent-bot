@@ -22,7 +22,7 @@ def form_page(title: str, action: str, csrf_token: str, fields: str, error: str 
 def form_fragment(title: str, action: str, csrf_token: str, fields: str, error: str = "") -> str:
     message = f'<p class="error">{escape(error)}</p>' if error else ""
     return (
-        f"<h1>{escape(title)}</h1>{message}<form method=post action=\"{escape(action)}\">"
+        f'<h1>{escape(title)}</h1>{message}<form method=post action="{escape(action)}">'
         f'<input type="hidden" name="csrf_token" value="{escape(csrf_token)}">'
         f"{fields}<button type=submit>保存</button></form>"
     )
@@ -76,7 +76,7 @@ def checkbox_field(label: str, name: str, checked: bool) -> str:
 def secret_field(label: str, name: str, configured: bool) -> str:
     state = "已配置；留空保持原值" if configured else "未配置"
     return (
-        f'<fieldset><legend>{escape(label)}（{state}）</legend>'
+        f"<fieldset><legend>{escape(label)}（{state}）</legend>"
         f'<input type="password" name="{escape(name)}" value="">'
         f'<label><input style="width:auto" type="checkbox" name="clear_{escape(name)}">'
         "清除现有值</label></fieldset>"

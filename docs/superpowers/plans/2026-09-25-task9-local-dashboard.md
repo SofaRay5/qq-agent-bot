@@ -371,7 +371,7 @@ git commit -m "feat: add local management dashboard"
 - Consumes: Task 9.5 `create_app` and Task 9.3 `BotManager`.
 - Produces: `python -m dashboard`, `bash scripts/start_dashboard.sh`, operating guide and evidence-based Checklist updates.
 
-- [ ] **Step 1: Write failing entry-point tests.**
+- [x] **Step 1: Write failing entry-point tests.**
 
 Patch aiohttp runner and `webbrowser.open`. Assert the entry point binds exactly `127.0.0.1:8765`, opens `http://127.0.0.1:8765/` only after binding succeeds, does not start the bot, reports an occupied port without opening a browser, and stops the manager on shutdown.
 
@@ -379,25 +379,25 @@ Run: `uv run pytest tests/test_dashboard_entrypoint.py -q`
 
 Expected: FAIL because the entry point does not exist.
 
-- [ ] **Step 2: Implement the entry point and shell script.**
+- [x] **Step 2: Implement the entry point and shell script.**
 
 `scripts/start_dashboard.sh` changes to the repository root and executes `uv run python -m dashboard`. Configure existing safe logging once. `Ctrl+C` invokes manager shutdown before aiohttp cleanup.
 
-- [ ] **Step 3: Run focused dashboard and compatibility tests.**
+- [x] **Step 3: Run focused dashboard and compatibility tests.**
 
 Run: `uv run pytest tests/test_private_config.py tests/test_groupmate.py tests/test_bot_runtime.py tests/test_dashboard_auth.py tests/test_dashboard_runtime.py tests/test_dashboard_app.py tests/test_dashboard_entrypoint.py tests/test_start_ui.py tests/test_bot.py -q`
 
 Expected: PASS.
 
-- [ ] **Step 4: Write operating documentation.**
+- [x] **Step 4: Write operating documentation.**
 
 Document first-run password creation, credential setup, Start/Stop, live settings/persona/provider updates, NapCat restart-required fields, status/error privacy, password reset, terminal fallback and stopping with `Ctrl+C`. Include exact real-Mac acceptance steps from the spec.
 
-- [ ] **Step 5: Update progress only with current evidence.**
+- [x] **Step 5: Update progress only with current evidence.**
 
 Add the spec, plan and Task 9 guide to `docs/README.md`. Mark Task 9 spec/plan and implemented subtasks complete after their evidence exists. Leave real local dashboard/QQ acceptance unchecked until the user performs it. Do not change Task 7 real-image acceptance merely because its settings appear in the dashboard.
 
-- [ ] **Step 6: Run the one full verification pass.**
+- [x] **Step 6: Run the one full verification pass.**
 
 Run: `uv run pre-commit run --all-files`
 
@@ -407,7 +407,7 @@ Run: `git diff --check`
 
 Expected: no output and exit 0.
 
-- [ ] **Step 7: Commit Task 9.6 and stop at real-service acceptance.**
+- [x] **Step 7: Commit Task 9.6 and stop at real-service acceptance.**
 
 ```bash
 git add dashboard/__main__.py scripts/start_dashboard.sh tests/test_dashboard_entrypoint.py README.md docs/README.md docs/任务Checklist.md docs/Task9测试指南.md

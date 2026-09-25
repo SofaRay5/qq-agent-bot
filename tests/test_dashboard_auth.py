@@ -56,9 +56,7 @@ def test_missing_auth_file_allows_setup(tmp_path: Path) -> None:
     "content",
     ["{", "{}", '{"version":2,"salt":"AA==","password_hash":"AA=="}'],
 )
-def test_corrupt_or_invalid_existing_auth_file_fails_closed(
-    tmp_path: Path, content: str
-) -> None:
+def test_corrupt_or_invalid_existing_auth_file_fails_closed(tmp_path: Path, content: str) -> None:
     path = tmp_path / "data" / "admin_auth.json"
     path.parent.mkdir()
     path.write_text(content, encoding="utf-8")
