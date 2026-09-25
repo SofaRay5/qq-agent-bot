@@ -309,7 +309,7 @@ git commit -m "feat: secure local dashboard login"
 - Consumes: Task 9.1 storage, Task 9.3 `BotManager`, Task 9.4 auth/session APIs.
 - Produces: `create_app(root: Path, manager: BotManager) -> aiohttp.web.Application` and the four authenticated page flows.
 
-- [ ] **Step 1: Write failing setup/login/security route tests.**
+- [x] **Step 1: Write failing setup/login/security route tests.**
 
 Using `aiohttp.test_utils.TestClient`, assert first run redirects to password setup; setup accepts a valid password; login rotates the session cookie with `HttpOnly` and `SameSite=Strict`; unauthenticated reads redirect; and every POST without the matching CSRF token returns 403. Set `client_max_size=65536` and assert oversized requests return 413.
 
@@ -317,11 +317,11 @@ Run: `uv run pytest tests/test_dashboard_app.py -q`
 
 Expected: FAIL because the app does not exist.
 
-- [ ] **Step 2: Implement app creation, auth guards and shared escaped layout.**
+- [x] **Step 2: Implement app creation, auth guards and shared escaped layout.**
 
 Use aiohttp routes and `html.escape`; do not add a template dependency. Catch unexpected route failures with a generic page while logging only the exception class. Keep cookies non-Secure for the fixed local HTTP origin as required by the spec.
 
-- [ ] **Step 3: Write failing page and secret-handling tests.**
+- [x] **Step 3: Write failing page and secret-handling tests.**
 
 Assert four pages exist for status, behavior, models/connection and persona. Assert saved `<script>` persona text appears escaped, chat text never appears, full secrets never appear, and secret fields show only configured state plus at most the final four characters. Assert blank secret input preserves the prior value and an explicit clear action removes it.
 
@@ -329,11 +329,11 @@ Run: `uv run pytest tests/test_dashboard_app.py -q`
 
 Expected: FAIL because page routes and forms are incomplete.
 
-- [ ] **Step 4: Implement the four minimal pages and validated POST handlers.**
+- [x] **Step 4: Implement the four minimal pages and validated POST handlers.**
 
 Render all Task 8 settings and Persona fields, NapCat fields, separate chat/vision providers and the vision toggle. DeepSeek selection fills its preset URL/default model server-side. On successful behavior/persona/provider save, persist first and then call `manager.update_runtime`; on NapCat changes show a restart-required notice. No JavaScript framework or live log view.
 
-- [ ] **Step 5: Write failing invalid/corrupt/save-failure tests.**
+- [x] **Step 5: Write failing invalid/corrupt/save-failure tests.**
 
 Assert field errors preserve entered non-secret values; corrupt `private.json` keeps the dashboard accessible but disables Start with a safe configuration error; failed `os.replace` keeps the old secret and does not call runtime update; and Start/Stop routes report the manager's resulting state. Assert no response contains corrupt file content, secret values or private paths.
 
@@ -341,11 +341,11 @@ Run: `uv run pytest tests/test_dashboard_app.py -q`
 
 Expected: FAIL until failure paths are implemented.
 
-- [ ] **Step 6: Complete safe failure handling and status data.**
+- [x] **Step 6: Complete safe failure handling and status data.**
 
 Status renders manager state, `DailyBudget.usage()` counts and remaining limits, plus the last 20 safe error entries. Disable Start when `PrivateSettings.validate_for_start()` or existing behavior/persona loading fails.
 
-- [ ] **Step 7: Verify and commit Task 9.5.**
+- [x] **Step 7: Verify and commit Task 9.5.**
 
 Run: `uv run pytest tests/test_dashboard_app.py tests/test_dashboard_auth.py tests/test_dashboard_runtime.py -q`
 
