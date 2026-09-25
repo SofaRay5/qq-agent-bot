@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 
 from agent.groupmate import GroupmateReply
 from agent.vision import VisionDescriber
-from config.models import load_persona, load_settings
+from config.models import ProviderSettings, load_persona, load_settings
 from core.budget import DailyBudget
 from core.dispatcher import Dispatcher
 from core.groupmate import GroupmateCoordinator
@@ -73,11 +73,28 @@ async def run() -> None:
     persona = load_persona(ROOT)
     budget = DailyBudget(settings, ROOT / "data" / "model_usage.db")
     client = OneBotClient(ws_url, token)
-    reply = GroupmateReply(persona, api_key, budget)
+    reply = GroupmateReply(
+        persona,
+        ProviderSettings(
+            provider="deepseek",
+            base_url="https://api.deepseek.com",
+            model="deepseek-flash",
+            api_key=api_key,
+        ),
+        budget,
+    )
     vision = None
     if vision_settings is not None:
         vision_key, vision_model, vision_url = vision_settings
-        vision = VisionDescriber(vision_key, vision_model, vision_url, budget)
+        vision = VisionDescriber(
+            ProviderSettings(
+                provider="openai_compatible",
+                base_url=vision_url,
+                model=vision_model,
+                api_key=vision_key,
+            ),
+            budget,
+        )
     coordinator = GroupmateCoordinator(
         settings,
         persona.name,

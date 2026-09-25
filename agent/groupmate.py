@@ -9,7 +9,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
 
-from config.models import Persona
+from config.models import Persona, ProviderSettings
 from core.budget import BudgetResult, DailyBudget
 
 ReplyMode = Literal["direct", "continue", "random", "topic"]
@@ -29,16 +29,25 @@ class BudgetExceeded(RuntimeError):
 
 
 class GroupmateReply:
-    def __init__(self, persona: Persona, api_key: str, budget: DailyBudget) -> None:
+    def __init__(
+        self,
+        persona: Persona,
+        provider: ProviderSettings,
+        budget: DailyBudget,
+    ) -> None:
         self._persona = persona
         self._budget = budget
-        self._model = ChatOpenAI(
-            model="deepseek-flash",
-            base_url="https://api.deepseek.com",
-            api_key=SecretStr(api_key),
-            extra_body={"thinking": {"type": "disabled"}},
-            model_kwargs={"response_format": {"type": "json_object"}},
-            max_retries=0,
+        common = {
+            "model": provider.model,
+            "base_url": provider.base_url,
+            "api_key": SecretStr(provider.api_key),
+            "model_kwargs": {"response_format": {"type": "json_object"}},
+            "max_retries": 0,
+        }
+        self._model = (
+            ChatOpenAI(extra_body={"thinking": {"type": "disabled"}}, **common)
+            if provider.provider == "deepseek"
+            else ChatOpenAI(**common)
         )
 
     def _messages(

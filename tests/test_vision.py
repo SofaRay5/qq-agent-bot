@@ -10,6 +10,7 @@ import agent.vision as vision_module
 from agent.groupmate import BudgetExceeded
 from agent.image_fetch import ImageDownloadError
 from agent.vision import VisionDescriber
+from config.models import ProviderSettings
 from core.budget import BudgetResult, DailyBudget
 
 PNG = b"\x89PNG\r\n\x1a\nimage"
@@ -42,6 +43,23 @@ async def fake_fetch(_url: str, _size: int | None) -> tuple[str, bytes]:
     return "image/png", PNG
 
 
+def vision_provider(
+    *,
+    provider: str = "openai_compatible",
+    base_url: str = "https://vision.example/v1",
+    model: str = "vision-model",
+    api_key: str = "vision-test-key",
+) -> ProviderSettings:
+    return ProviderSettings.model_validate(
+        {
+            "provider": provider,
+            "base_url": base_url,
+            "model": model,
+            "api_key": api_key,
+        }
+    )
+
+
 @pytest.mark.asyncio
 async def test_vision_describer_returns_caption_without_chat_call(
     monkeypatch: pytest.MonkeyPatch,
@@ -56,12 +74,7 @@ async def test_vision_describer_returns_caption_without_chat_call(
 
     monkeypatch.setattr(vision_module, "ChatOpenAI", fake_model)
     monkeypatch.setattr(vision_module, "fetch_image", fake_fetch)
-    describer = VisionDescriber(
-        "vision-test-key",
-        "vision-model",
-        "https://vision.example/v1",
-        cast(DailyBudget, budget),
-    )
+    describer = VisionDescriber(vision_provider(), cast(DailyBudget, budget))
 
     assert await describer("https://multimedia.nt.qq.com.cn/image", 42) == "一只猫"
     assert budget.calls == ["vision"]
@@ -93,7 +106,7 @@ async def test_vision_describer_reads_napcat_cached_file(
     model = FakeVisionModel("一份薯条")
     monkeypatch.setattr(vision_module, "ChatOpenAI", lambda **_kwargs: model)
     describer = VisionDescriber(
-        "key", "model", "https://vision.example/v1", cast(DailyBudget, FakeBudget())
+        vision_provider(api_key="key", model="model"), cast(DailyBudget, FakeBudget())
     )
 
     assert await describer.describe_file(str(path), len(PNG)) == "一份薯条"
@@ -113,7 +126,7 @@ async def test_vision_download_failure_does_not_reserve(
     monkeypatch.setattr(vision_module, "ChatOpenAI", lambda **_kwargs: model)
     monkeypatch.setattr(vision_module, "fetch_image", fail_fetch)
     describer = VisionDescriber(
-        "key", "model", "https://vision.example/v1", cast(DailyBudget, budget)
+        vision_provider(api_key="key", model="model"), cast(DailyBudget, budget)
     )
 
     with caplog.at_level(logging.ERROR, logger="agent.vision"):
@@ -135,7 +148,7 @@ async def test_denied_vision_budget_skips_provider(
     monkeypatch.setattr(vision_module, "ChatOpenAI", lambda **_kwargs: model)
     monkeypatch.setattr(vision_module, "fetch_image", fake_fetch)
     describer = VisionDescriber(
-        "key", "model", "https://vision.example/v1", cast(DailyBudget, budget)
+        vision_provider(api_key="key", model="model"), cast(DailyBudget, budget)
     )
 
     with pytest.raises(BudgetExceeded) as caught:
@@ -155,7 +168,7 @@ async def test_vision_provider_failure_consumes_reservation(
     monkeypatch.setattr(vision_module, "ChatOpenAI", lambda **_kwargs: model)
     monkeypatch.setattr(vision_module, "fetch_image", fake_fetch)
     describer = VisionDescriber(
-        "key", "model", "https://vision.example/v1", cast(DailyBudget, budget)
+        vision_provider(api_key="key", model="model"), cast(DailyBudget, budget)
     )
 
     with pytest.raises(ConnectionError, match="provider failed"):
@@ -175,7 +188,7 @@ async def test_vision_describer_rejects_empty_or_non_text_caption(
     monkeypatch.setattr(vision_module, "ChatOpenAI", lambda **_kwargs: model)
     monkeypatch.setattr(vision_module, "fetch_image", fake_fetch)
     describer = VisionDescriber(
-        "key", "model", "https://vision.example/v1", cast(DailyBudget, FakeBudget())
+        vision_provider(api_key="key", model="model"), cast(DailyBudget, FakeBudget())
     )
 
     with pytest.raises(ValueError, match="Empty vision description"):
@@ -192,7 +205,7 @@ async def test_invalid_vision_response_logs_only_safe_shape_metadata(
     monkeypatch.setattr(vision_module, "ChatOpenAI", lambda **_kwargs: model)
     monkeypatch.setattr(vision_module, "fetch_image", fake_fetch)
     describer = VisionDescriber(
-        "key", "model", "https://vision.example/v1", cast(DailyBudget, FakeBudget())
+        vision_provider(api_key="key", model="model"), cast(DailyBudget, FakeBudget())
     )
 
     with caplog.at_level(logging.ERROR, logger="agent.vision"):
@@ -216,7 +229,7 @@ async def test_provider_body_error_logs_only_safe_code_and_type(
     monkeypatch.setattr(vision_module, "ChatOpenAI", lambda **_kwargs: model)
     monkeypatch.setattr(vision_module, "fetch_image", fake_fetch)
     describer = VisionDescriber(
-        "key", "model", "https://vision.example/v1", cast(DailyBudget, FakeBudget())
+        vision_provider(api_key="key", model="model"), cast(DailyBudget, FakeBudget())
     )
 
     with caplog.at_level(logging.ERROR, logger="agent.vision"):

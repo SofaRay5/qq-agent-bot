@@ -7,7 +7,7 @@ from pydantic import SecretStr
 
 import agent.groupmate as groupmate_module
 from agent.groupmate import BudgetExceeded, GroupmateReply, HistoryMessage
-from config.models import Persona
+from config.models import Persona, ProviderSettings
 from core.budget import BudgetResult, DailyBudget
 
 
@@ -64,6 +64,7 @@ def build_reply(
     persona: Persona,
     model: FakeModel,
     budget: FakeBudget,
+    provider: ProviderSettings | None = None,
 ) -> tuple[GroupmateReply, list[dict[str, object]]]:
     created: list[dict[str, object]] = []
 
@@ -72,7 +73,17 @@ def build_reply(
         return model
 
     monkeypatch.setattr(groupmate_module, "ChatOpenAI", fake_model)
-    reply = GroupmateReply(persona, "deepseek-secret-key", cast(DailyBudget, budget))
+    reply = GroupmateReply(
+        persona,
+        provider
+        or ProviderSettings(
+            provider="deepseek",
+            base_url="https://api.deepseek.com",
+            model="deepseek-flash",
+            api_key="deepseek-secret-key",
+        ),
+        cast(DailyBudget, budget),
+    )
     return reply, created
 
 
@@ -120,6 +131,30 @@ async def test_builds_safe_persona_prompt_and_parses_reply(
     assert "direct" in system
     assert "deepseek-secret-key" not in system
     assert messages[-1].content == "[乙/2] 小薯，你怎么看？"
+
+
+def test_openai_compatible_provider_omits_deepseek_thinking(
+    monkeypatch: pytest.MonkeyPatch,
+    persona: Persona,
+) -> None:
+    provider = ProviderSettings(
+        provider="openai_compatible",
+        base_url="https://models.example/v1",
+        model="chat-model",
+        api_key="generic-secret-key",
+    )
+
+    _, created = build_reply(monkeypatch, persona, FakeModel(""), FakeBudget(), provider)
+
+    assert created == [
+        {
+            "model": "chat-model",
+            "base_url": "https://models.example/v1",
+            "api_key": SecretStr("generic-secret-key"),
+            "model_kwargs": {"response_format": {"type": "json_object"}},
+            "max_retries": 0,
+        }
+    ]
 
 
 @pytest.mark.asyncio

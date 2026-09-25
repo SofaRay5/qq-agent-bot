@@ -11,7 +11,7 @@ from agent.groupmate import BudgetExceeded, GroupmateReply, HistoryMessage, Repl
 from agent.image_fetch import ImageDownloadError
 from agent.vision import VisionDescriber
 from config.models import Settings
-from core.groupmate import GroupmateCoordinator
+from core.groupmate import GroupmateCoordinator, GroupmateRuntime
 from onebot_adapter.event import GroupMessageEvent, PrivateMessageEvent
 
 
@@ -488,6 +488,50 @@ async def test_same_group_is_ordered_while_other_group_proceeds() -> None:
         "答:[群名片/111] 小薯，阻塞",
         "答:[群名片/111] 小薯，后到",
     ]
+
+
+@pytest.mark.asyncio
+async def test_runtime_swap_finishes_old_request_then_preserves_history() -> None:
+    old_reply = BlockingReply("第一条")
+    new_reply = FakeReply()
+    bot = coordinator(old_reply)
+    send = SendRecorder()
+
+    first = asyncio.create_task(bot.handle(private_event("第一条", message_id=1), send))
+    await old_reply.started.wait()
+    bot.replace_runtime(
+        GroupmateRuntime(settings(), "小薯", cast(GroupmateReply, new_reply), None)
+    )
+    old_reply.release.set()
+    await first
+    await bot.handle(private_event("第二条", message_id=2), send)
+
+    assert len(old_reply.calls) == 1
+    assert len(new_reply.calls) == 1
+    assert [item.content for item in new_reply.calls[0].history] == [
+        "[小明/111] 第一条",
+        "答:[小明/111] 第一条",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_runtime_swap_applies_new_settings_and_persona_name() -> None:
+    clock = Clock()
+    new_reply = FakeReply()
+    bot = coordinator(FakeReply(), clock=clock)
+    bot.replace_runtime(
+        GroupmateRuntime(
+            settings(send_delay_seconds=2),
+            "新薯",
+            cast(GroupmateReply, new_reply),
+            None,
+        )
+    )
+
+    await bot.handle(group_event("新薯，聊聊", group_id=9), SendRecorder())
+
+    assert [call.mode for call in new_reply.calls] == ["direct"]
+    assert clock.sleeps == [2]
 
 
 @pytest.mark.asyncio

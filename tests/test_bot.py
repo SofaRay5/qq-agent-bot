@@ -10,7 +10,7 @@ from websockets.asyncio.server import ServerConnection, serve
 
 import main as bot_main
 from agent.groupmate import BudgetExceeded, HistoryMessage, ReplyMode
-from config.models import Persona
+from config.models import Persona, ProviderSettings
 from main import run
 
 SETTINGS = {
@@ -61,9 +61,16 @@ def set_base_config(monkeypatch: pytest.MonkeyPatch) -> None:
 class FakeReply:
     instances: list["FakeReply"] = []
 
-    def __init__(self, persona: Persona, api_key: str, _budget: object) -> None:
+    def __init__(
+        self, persona: Persona, provider: ProviderSettings, _budget: object
+    ) -> None:
         assert persona.name == "小薯"
-        assert api_key == "test-api-key"
+        assert provider == ProviderSettings(
+            provider="deepseek",
+            base_url="https://api.deepseek.com",
+            model="deepseek-flash",
+            api_key="test-api-key",
+        )
         self.calls: list[tuple[tuple[HistoryMessage, ...], str, ReplyMode, str]] = []
         self.instances.append(self)
 
@@ -85,11 +92,12 @@ class FakeReply:
 class FakeVision:
     instances: list["FakeVision"] = []
 
-    def __init__(self, api_key: str, model: str, base_url: str, _budget: object) -> None:
-        assert (api_key, model, base_url) == (
-            "vision-key",
-            "vision-model",
-            "https://vision.example/v1",
+    def __init__(self, provider: ProviderSettings, _budget: object) -> None:
+        assert provider == ProviderSettings(
+            provider="openai_compatible",
+            base_url="https://vision.example/v1",
+            model="vision-model",
+            api_key="vision-key",
         )
         self.calls: list[tuple[str, int | None]] = []
         self.instances.append(self)

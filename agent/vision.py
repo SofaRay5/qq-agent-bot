@@ -10,6 +10,7 @@ from pydantic import SecretStr
 
 from agent.groupmate import BudgetExceeded
 from agent.image_fetch import ImageDownloadError, fetch_image, read_image_file
+from config.models import ProviderSettings
 from core.budget import DailyBudget
 
 logger = logging.getLogger(__name__)
@@ -38,16 +39,14 @@ def _image_message(mime: str, image: bytes) -> HumanMessage:
 class VisionDescriber:
     def __init__(
         self,
-        api_key: str,
-        model: str,
-        base_url: str,
+        provider: ProviderSettings,
         budget: DailyBudget,
     ) -> None:
         self._budget = budget
         self._model = ChatOpenAI(
-            model=model,
-            base_url=base_url,
-            api_key=SecretStr(api_key),
+            model=provider.model,
+            base_url=provider.base_url,
+            api_key=SecretStr(provider.api_key),
             max_retries=0,
         )
 
