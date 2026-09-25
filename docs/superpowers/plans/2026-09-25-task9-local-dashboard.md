@@ -48,13 +48,13 @@
 - Consumes: existing `StrictModel`, `Settings`, `Persona`, `load_settings(root)`, `load_persona(root)`.
 - Produces: `ProviderSettings`, `PrivateSettings`, `atomic_write_json(path: Path, payload: object) -> None`, `load_private_settings(root: Path) -> PrivateSettings`, `save_private_settings(root: Path, value: PrivateSettings) -> None`, `save_settings(root: Path, value: Settings) -> None`, and `save_persona(root: Path, value: Persona) -> None`.
 
-- [ ] **Step 1: Add `aiohttp` with uv.**
+- [x] **Step 1: Add `aiohttp` with uv.**
 
 Run: `uv add aiohttp`
 
 Expected: `pyproject.toml` and `uv.lock` contain aiohttp; no other direct product dependency is added.
 
-- [ ] **Step 2: Write failing private-model tests.**
+- [x] **Step 2: Write failing private-model tests.**
 
 Add tests proving:
 
@@ -68,7 +68,7 @@ Run: `uv run pytest tests/test_private_config.py -q`
 
 Expected: FAIL because the models do not exist.
 
-- [ ] **Step 3: Add strict private models.**
+- [x] **Step 3: Add strict private models.**
 
 In `config/models.py`, add:
 
@@ -80,13 +80,13 @@ class PrivateSettings(StrictModel):
 
 Use `provider: Literal["deepseek", "openai_compatible"]`; keep secrets as `str` fields excluded from repr. Keep missing first-run fields as empty strings, while `validate_for_start()` requires NapCat URL/token, chat URL/model/key, and all vision fields when vision is enabled.
 
-- [ ] **Step 4: Run model tests.**
+- [x] **Step 4: Run model tests.**
 
 Run: `uv run pytest tests/test_private_config.py -q`
 
 Expected: model tests PASS; storage tests are not added yet.
 
-- [ ] **Step 5: Write failing atomic-storage tests.**
+- [x] **Step 5: Write failing atomic-storage tests.**
 
 Test that saves create `config/private.json`, `config/settings.json` and `config/persona.json` with mode `0o600`; reload returns the same validated values; the tracked examples remain untouched; and a monkeypatched `os.replace` failure leaves the previous file unchanged.
 
@@ -96,11 +96,11 @@ Run: `uv run pytest tests/test_private_config.py -q`
 
 Expected: FAIL because storage functions do not exist.
 
-- [ ] **Step 6: Implement one atomic JSON writer and the four storage functions.**
+- [x] **Step 6: Implement one atomic JSON writer and the four storage functions.**
 
 In `config/storage.py`, implement `atomic_write_json` with a same-directory temporary file, UTF-8 JSON, `os.chmod(path, 0o600)` and `os.replace`. Reuse it for all saves and later authentication storage. `load_private_settings` returns an empty first-run `PrivateSettings` only when the file is absent; malformed existing JSON raises a safe `ValueError`.
 
-- [ ] **Step 7: Verify and commit Task 9.1.**
+- [x] **Step 7: Verify and commit Task 9.1.**
 
 Run: `uv run pytest tests/test_private_config.py tests/test_config.py -q`
 
