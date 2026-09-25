@@ -34,7 +34,7 @@
 
 ---
 
-### Task 9.1: Strict Private Configuration and Atomic Storage
+### Task 1: 9.1 Strict Private Configuration and Atomic Storage
 
 **Files:**
 - Modify: `pyproject.toml`
@@ -111,7 +111,7 @@ git add pyproject.toml uv.lock .gitignore config/models.py config/storage.py tes
 git commit -m "feat: add private dashboard configuration"
 ```
 
-### Task 9.2: Provider Selection and Per-Message Runtime Swaps
+### Task 2: 9.2 Provider Selection and Per-Message Runtime Swaps
 
 **Files:**
 - Modify: `agent/groupmate.py`
@@ -179,7 +179,7 @@ git add agent/groupmate.py agent/vision.py core/groupmate.py tests/test_groupmat
 git commit -m "feat: support live groupmate configuration"
 ```
 
-### Task 9.3: Bot Lifecycle, Connection State and Usage
+### Task 3: 9.3 Bot Lifecycle, Connection State and Usage
 
 **Files:**
 - Create: `bot_runtime.py`
@@ -253,7 +253,7 @@ git add bot_runtime.py dashboard/__init__.py dashboard/runtime.py main.py onebot
 git commit -m "feat: manage bot runtime lifecycle"
 ```
 
-### Task 9.4: Single-Owner Authentication and CSRF
+### Task 4: 9.4 Single-Owner Authentication and CSRF
 
 **Files:**
 - Create: `dashboard/auth.py`
@@ -298,7 +298,7 @@ git add dashboard/auth.py tests/test_dashboard_auth.py
 git commit -m "feat: secure local dashboard login"
 ```
 
-### Task 9.5: Server-Rendered Dashboard Pages
+### Task 5: 9.5 Server-Rendered Dashboard Pages
 
 **Files:**
 - Create: `dashboard/app.py`
@@ -356,7 +356,7 @@ git add dashboard/app.py dashboard/views.py tests/test_dashboard_app.py
 git commit -m "feat: add local management dashboard"
 ```
 
-### Task 9.6: One-Command Startup, Documentation and Acceptance Gate
+### Task 6: 9.6 One-Command Startup, Documentation and Acceptance Gate
 
 **Files:**
 - Create: `dashboard/__main__.py`
