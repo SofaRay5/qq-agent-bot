@@ -1,3 +1,4 @@
+import logging
 from typing import Any, cast
 
 import pytest
@@ -103,6 +104,8 @@ async def test_builds_safe_persona_prompt_and_parses_reply(
     system = messages[0].content
     assert isinstance(system, str)
     assert "JSON" in system
+    assert "非空" in system
+    assert "Markdown" in system
     assert system.index("安全规则") < system.index("独特角色描述")
     assert "direct" in system
     assert "deepseek-secret-key" not in system
@@ -147,6 +150,27 @@ async def test_rejects_invalid_reply_protocol(
 
     with pytest.raises((ValueError, TypeError)):
         await reply([], "你好", "direct", "chat")
+
+
+@pytest.mark.asyncio
+async def test_invalid_json_logs_only_safe_shape_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+    persona: Persona,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    secret_output = "sensitive-invalid-model-output"
+    reply, _ = build_reply(monkeypatch, persona, FakeModel(secret_output), FakeBudget())
+
+    with caplog.at_level(logging.ERROR, logger="agent.groupmate"):
+        with pytest.raises(ValueError, match="Invalid groupmate reply") as caught:
+            await reply([], "private-message-body", "direct", "chat")
+
+    assert "empty=False" in caplog.text
+    assert f"length={len(secret_output)}" in caplog.text
+    assert "finish=unknown" in caplog.text
+    assert secret_output not in caplog.text
+    assert "private-message-body" not in caplog.text
+    assert caught.value.__context__ is None
 
 
 @pytest.mark.asyncio
