@@ -10,6 +10,7 @@
 - [superpowers/specs/2026-09-24-ai-groupmate-expansion-design.md](superpowers/specs/2026-09-24-ai-groupmate-expansion-design.md) — 已批准的 AI 群友扩展总设计与 Task 7–11 顺序。
 - [superpowers/specs/2026-09-24-task8-groupmate-behavior-design.md](superpowers/specs/2026-09-24-task8-groupmate-behavior-design.md) — 已批准的 Task 8 群友行为、人格与费用专项设计。
 - [superpowers/specs/2026-09-25-task9-local-dashboard-design.md](superpowers/specs/2026-09-25-task9-local-dashboard-design.md) — 已批准的 Task 9 本地浏览器后台设计。
+- [superpowers/specs/2026-09-26-task10-sqlite-memory-design.md](superpowers/specs/2026-09-26-task10-sqlite-memory-design.md) — 待审阅的 Task 10 SQLite 长期记忆与后台易用性设计。
 - [superpowers/plans/2026-09-23-qq-bot-mvp.md](superpowers/plans/2026-09-23-qq-bot-mvp.md) — 逐任务实施计划和 Task/Step 勾选。
 - [superpowers/plans/2026-09-24-task7-image-understanding.md](superpowers/plans/2026-09-24-task7-image-understanding.md) — 已批准并执行的 Task 7 识图实施计划。
 - [superpowers/plans/2026-09-24-task8-groupmate-behavior.md](superpowers/plans/2026-09-24-task8-groupmate-behavior.md) — 已批准并执行的 Task 8 群友行为实施计划。
