@@ -46,7 +46,7 @@
 - `MemoryStore(path: Path)` exposes async `initialize() -> None`, `create(scope, kind, content, importance, source, created_by) -> MemoryRecord`, `update(item_id, content, importance, source, created_by) -> MemoryRecord`, `recall(context, query, limit=5, max_characters=1500) -> tuple[MemoryRecord, ...]`, `list_current(scope=None, kind=None, query="", limit=50, offset=0) -> tuple[MemoryRecord, ...]`, `history(item_id) -> tuple[MemoryVersion, ...]`, `copy(item_id, target_scope) -> MemoryRecord`, `delete(item_id) -> None` and `clear(scope) -> int`.
 - `MemoryScope` constructors validate `private(user_id)`, `group_user(group_id, user_id)` and `group_shared(group_id)`.
 
-- [ ] **Step 1: Write failing schema and scope tests.**
+- [x] **Step 1: Write failing schema and scope tests.**
 
 Assert initialization creates only `memory_items` and `memory_versions`, enables foreign keys and WAL, accepts all three valid scopes, rejects zero/negative or malformed ID combinations, and ignores no existing valid rows on repeated initialization.
 
@@ -54,19 +54,19 @@ Run: `uv run pytest tests/test_memory_store.py -q`
 
 Expected: FAIL because `memory.store` does not exist.
 
-- [ ] **Step 2: Implement the minimal store schema and validated value types.**
+- [x] **Step 2: Implement the minimal store schema and validated value types.**
 
 Use short-lived `sqlite3` connections through `asyncio.to_thread`, `PRAGMA user_version`, a finite busy timeout, scope `CHECK` constraints, one-current-version uniqueness and foreign-key cascade. The existing `.gitignore` already covers both `*.db` and `data/`.
 
-- [ ] **Step 3: Write failing version, isolation and deletion tests.**
+- [x] **Step 3: Write failing version, isolation and deletion tests.**
 
 Assert create returns version 1; update makes version 2 current and version 1 historical; private/group-user/group-shared recall is isolated; copy creates a new item in the target scope; delete removes every version; clear affects only the exact scope. Include concurrent updates and a malformed/partial schema that must fail without deleting the file.
 
-- [ ] **Step 4: Implement transactions, bounded recall and administration methods.**
+- [x] **Step 4: Implement transactions, bounded recall and administration methods.**
 
 `recall(context: MemoryContext, query: str, limit: int = 5, max_characters: int = 1500)` must combine group-user plus group-shared candidates only for the same group, rank locally by phrase overlap, importance and update time, and return current versions only. Explicit memory questions may relax overlap but keep limits.
 
-- [ ] **Step 5: Verify and commit Task 10.1.**
+- [x] **Step 5: Verify and commit Task 10.1.**
 
 Run: `uv run pytest tests/test_memory_store.py -q`
 
