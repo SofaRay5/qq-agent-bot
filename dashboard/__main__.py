@@ -15,6 +15,7 @@ PORT = 8765
 URL = f"http://{HOST}:{PORT}/"
 ROOT = Path(__file__).resolve().parents[1]
 LOGGER = logging.getLogger("dashboard")
+__all__ = ["PORT", "HOST", "URL", "run", "main", "web", "webbrowser"]
 
 
 async def run() -> None:

@@ -120,6 +120,21 @@ async def test_post_requires_csrf_and_request_size_is_limited(client: TestClient
     assert response.status == 413
 
 
+async def test_reloading_setup_keeps_the_form_csrf_session(client: TestClient) -> None:
+    first = await client.get("/setup")
+    token = csrf(await first.text())
+    await client.get("/setup")
+
+    response = await client.post(
+        "/setup",
+        data={"password": "correct horse battery staple", "csrf_token": token},
+        allow_redirects=False,
+    )
+
+    assert response.status == 302
+    assert response.headers["Location"] == "/"
+
+
 def valid_settings() -> Settings:
     return Settings(
         continuous_window_seconds=600,

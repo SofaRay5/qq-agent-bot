@@ -77,6 +77,10 @@ def _session(request: web.Request) -> Session | None:
     return _state(request).sessions.get(session_id)
 
 
+def _anonymous_session(request: web.Request, state: DashboardState) -> Session:
+    return _session(request) or state.new_session()
+
+
 def _authenticated(request: web.Request) -> bool:
     session = _session(request)
     state = _state(request)
@@ -127,7 +131,7 @@ async def _setup_get(request: web.Request) -> web.Response:
     state = _state(request)
     if not state.auth.needs_setup():
         raise _redirect("/login")
-    session = state.new_session()
+    session = _anonymous_session(request, state)
     response = web.Response(
         text=form_page("创建管理密码", "/setup", session.csrf_token, password_fields()),
         content_type="text/html",
@@ -163,7 +167,7 @@ async def _login_get(request: web.Request) -> web.Response:
     state = _state(request)
     if state.auth.needs_setup():
         raise _redirect("/setup")
-    session = state.new_session()
+    session = _anonymous_session(request, state)
     response = web.Response(
         text=form_page("登录", "/login", session.csrf_token, password_fields()),
         content_type="text/html",
