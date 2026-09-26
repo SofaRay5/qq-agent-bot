@@ -196,3 +196,53 @@ async def test_database_errors_fail_closed(tmp_path: Path) -> None:
 
     with pytest.raises(sqlite3.Error):
         await budget.reserve("chat")
+
+
+@pytest.mark.asyncio
+async def test_memory_calls_obey_sub_limit_and_consume_total(tmp_path: Path) -> None:
+    budget = DailyBudget(
+        settings(
+            daily_model_calls=3,
+            daily_proactive_calls=3,
+            daily_vision_calls=3,
+            daily_memory_calls=1,
+        ),
+        tmp_path / "usage.db",
+    )
+
+    assert await budget.reserve("memory") == "ok"
+    assert await budget.reserve("memory") == "memory"
+    assert await budget.reserve("chat") == "ok"
+    assert await budget.usage() == BudgetUsage(total=2, proactive=0, vision=0, memory=1)
+
+
+@pytest.mark.asyncio
+async def test_old_usage_database_migrates_without_losing_counts(tmp_path: Path) -> None:
+    path = tmp_path / "usage.db"
+    today = date.today().isoformat()
+    with sqlite3.connect(path) as db:
+        db.execute(
+            "CREATE TABLE model_usage "
+            "(day TEXT PRIMARY KEY, total INTEGER NOT NULL, "
+            "proactive INTEGER NOT NULL, vision INTEGER NOT NULL)"
+        )
+        db.execute("INSERT INTO model_usage VALUES (?, 3, 1, 1)", (today,))
+
+    budget = DailyBudget(settings(daily_model_calls=10, daily_memory_calls=2), path)
+
+    assert await budget.usage() == BudgetUsage(total=3, proactive=1, vision=1, memory=0)
+    assert await budget.reserve("memory") == "ok"
+    assert await budget.usage() == BudgetUsage(total=4, proactive=1, vision=1, memory=1)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_memory_reservations_cannot_exceed_sub_limit(tmp_path: Path) -> None:
+    path = tmp_path / "usage.db"
+    limits = settings(daily_model_calls=10, daily_memory_calls=1)
+
+    results = await asyncio.gather(
+        DailyBudget(limits, path).reserve("memory"),
+        DailyBudget(limits, path).reserve("memory"),
+    )
+
+    assert sorted(results) == ["memory", "ok"]

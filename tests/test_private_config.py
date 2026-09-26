@@ -135,6 +135,88 @@ def test_secrets_are_excluded_from_repr() -> None:
     assert "provider-secret" not in representation
 
 
+def test_memory_provider_follows_chat_by_default() -> None:
+    value = PrivateSettings(chat=provider())
+
+    resolved = value.memory_provider()
+
+    assert resolved == value.chat
+    assert resolved is not value.chat
+    assert value.memory is None
+
+
+def test_independent_memory_provider_is_preserved() -> None:
+    memory = provider(
+        provider="openai_compatible",
+        base_url="https://memory.example/v1",
+        model="memory-model",
+        api_key="memory-secret",
+    )
+    value = PrivateSettings(chat=provider(), memory=memory)
+
+    assert value.memory_provider() == memory
+    assert value.memory_provider() is not memory
+
+
+def test_vision_can_reuse_only_chat_api_key() -> None:
+    value = PrivateSettings(
+        napcat_ws_url="ws://127.0.0.1:3001/",
+        napcat_access_token="napcat-secret",
+        chat=provider(api_key="chat-secret"),
+        vision_enabled=True,
+        vision_reuse_chat_api_key=True,
+        vision=provider(
+            provider="openai_compatible",
+            base_url="https://vision.example/v1",
+            model="vision-model",
+            api_key="",
+        ),
+    )
+
+    resolved = value.vision_provider()
+
+    assert resolved.base_url == "https://vision.example/v1"
+    assert resolved.model == "vision-model"
+    assert resolved.api_key == "chat-secret"
+    assert value.vision.api_key == ""
+    value.validate_for_start()
+
+
+def test_blank_resolved_keys_remain_safe_and_missing() -> None:
+    value = PrivateSettings(
+        napcat_ws_url="ws://127.0.0.1:3001/",
+        napcat_access_token="napcat-secret",
+        chat=provider(api_key=""),
+        memory=provider(api_key=""),
+        vision_enabled=True,
+        vision_reuse_chat_api_key=True,
+        vision=provider(api_key=""),
+    )
+
+    assert value.memory_provider().api_key == ""
+    assert value.vision_provider().api_key == ""
+    assert "provider-secret" not in repr(value.memory_provider())
+    with pytest.raises(ValueError, match="chat.api_key"):
+        value.validate_for_start()
+
+
+def test_provider_inheritance_persists_without_duplicate_keys(tmp_path: Path) -> None:
+    (tmp_path / "config").mkdir()
+    value = PrivateSettings(
+        chat=provider(api_key="chat-secret"),
+        memory=None,
+        vision_reuse_chat_api_key=True,
+        vision=provider(api_key=""),
+    )
+
+    save_private_settings(tmp_path, value)
+    saved = (tmp_path / "config/private.json").read_text(encoding="utf-8")
+
+    assert '"memory": null' in saved
+    assert '"vision_reuse_chat_api_key": true' in saved
+    assert saved.count("chat-secret") == 1
+
+
 def settings() -> Settings:
     return Settings.model_validate(
         {

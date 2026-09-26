@@ -49,7 +49,9 @@ class PrivateSettings(StrictModel):
             model="deepseek-flash",
         )
     )
+    memory: ProviderSettings | None = None
     vision_enabled: bool = False
+    vision_reuse_chat_api_key: bool = False
     vision: ProviderSettings = Field(default_factory=ProviderSettings)
 
     @field_validator("napcat_ws_url")
@@ -87,17 +89,38 @@ class PrivateSettings(StrictModel):
             if not value.strip()
         ]
         if self.vision_enabled:
+            vision = self.vision_provider()
             missing.extend(
                 name
                 for name, value in (
-                    ("vision.base_url", self.vision.base_url),
-                    ("vision.model", self.vision.model),
-                    ("vision.api_key", self.vision.api_key),
+                    ("vision.base_url", vision.base_url),
+                    ("vision.model", vision.model),
+                    ("vision.api_key", vision.api_key),
+                )
+                if not value.strip()
+            )
+        if self.memory is not None:
+            missing.extend(
+                name
+                for name, value in (
+                    ("memory.base_url", self.memory.base_url),
+                    ("memory.model", self.memory.model),
+                    ("memory.api_key", self.memory.api_key),
                 )
                 if not value.strip()
             )
         if missing:
             raise ValueError(f"Missing private settings fields: {', '.join(missing)}")
+
+    def memory_provider(self) -> ProviderSettings:
+        """Resolve the optional memory override without mutating persisted settings."""
+        return (self.memory or self.chat).model_copy(deep=True)
+
+    def vision_provider(self) -> ProviderSettings:
+        """Resolve vision settings and optional primary-key reuse."""
+        if not self.vision_reuse_chat_api_key:
+            return self.vision.model_copy(deep=True)
+        return self.vision.model_copy(update={"api_key": self.chat.api_key}, deep=True)
 
 
 class Settings(StrictModel):
@@ -107,6 +130,7 @@ class Settings(StrictModel):
     daily_model_calls: int = Field(ge=1, le=1000)
     daily_proactive_calls: int = Field(ge=0, le=1000)
     daily_vision_calls: int = Field(ge=0, le=1000)
+    daily_memory_calls: int = Field(default=10, ge=0, le=1000)
     proactive_mode: Literal["off", "random", "topic", "both"]
     proactive_probability: float = Field(ge=0, le=1)
     minimum_reply_interval_seconds: float = Field(ge=0, le=300)

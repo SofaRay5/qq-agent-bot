@@ -93,23 +93,23 @@ git commit -m "feat: add versioned sqlite memory store"
 - Produces `PrivateSettings.memory_provider() -> ProviderSettings` and `vision_provider() -> ProviderSettings` resolved copies.
 - Extends `BudgetKind`, `BudgetResult` and `BudgetUsage` with `memory`.
 
-- [ ] **Step 1: Write failing provider-resolution tests.**
+- [x] **Step 1: Write failing provider-resolution tests.**
 
 Assert a missing memory override follows the full primary provider; an override is independent; vision can reuse only the primary API key while retaining its own URL/model; blank or cleared keys validate correctly; no resolved secret appears in `repr`.
 
-- [ ] **Step 2: Implement strict private configuration resolution.**
+- [x] **Step 2: Implement strict private configuration resolution.**
 
 Keep persisted overrides explicit: following the primary model stores `memory=null`; vision key reuse stores the boolean and does not duplicate the primary key into the vision object.
 
-- [ ] **Step 3: Write failing memory-budget migration tests.**
+- [x] **Step 3: Write failing memory-budget migration tests.**
 
 Assert memory reservations increment total and memory counters atomically, obey both limits, expose usage, and migrate an existing Task 8 `model_usage` table by adding a zero-filled memory column without losing counters.
 
-- [ ] **Step 4: Implement `daily_memory_calls` and the SQLite counter migration.**
+- [x] **Step 4: Implement `daily_memory_calls` and the SQLite counter migration.**
 
 Keep one `model_usage.db`; do not create a second budget database.
 
-- [ ] **Step 5: Verify and commit Task 10.2.**
+- [x] **Step 5: Verify and commit Task 10.2.**
 
 Run: `uv run pytest tests/test_config.py tests/test_private_config.py tests/test_budget.py -q`
 

@@ -74,6 +74,7 @@ def test_local_files_override_examples(tmp_path: Path) -> None:
         ),
         ("daily_proactive_calls", 0, 1000, {"daily_model_calls": 1000}),
         ("daily_vision_calls", 0, 1000, {"daily_model_calls": 1000}),
+        ("daily_memory_calls", 0, 1000, {}),
         ("proactive_probability", 0.0, 1.0, {}),
         ("minimum_reply_interval_seconds", 0.0, 300.0, {}),
         ("send_delay_seconds", 0.0, 300.0, {}),
@@ -106,6 +107,7 @@ def test_settings_accept_numeric_boundaries(
         ),
         ("daily_proactive_calls", -1, 1001, {"daily_model_calls": 1000}),
         ("daily_vision_calls", -1, 1001, {"daily_model_calls": 1000}),
+        ("daily_memory_calls", -1, 1001, {}),
         ("proactive_probability", -0.01, 1.01, {}),
         ("minimum_reply_interval_seconds", -0.1, 300.1, {}),
         ("send_delay_seconds", -0.1, 300.1, {}),
@@ -133,6 +135,7 @@ def test_settings_reject_values_outside_numeric_boundaries(
         "daily_model_calls",
         "daily_proactive_calls",
         "daily_vision_calls",
+        "daily_memory_calls",
         "proactive_probability",
         "minimum_reply_interval_seconds",
         "send_delay_seconds",
@@ -166,6 +169,12 @@ def test_settings_reject_inconsistent_limits(tmp_path: Path, changes: dict[str, 
 
     with pytest.raises(ValueError, match="exceeds"):
         load_settings(tmp_path)
+
+
+def test_memory_limit_defaults_to_ten_even_when_total_is_lower() -> None:
+    value = Settings.model_validate({**DEFAULT_SETTINGS, "daily_model_calls": 5})
+
+    assert value.daily_memory_calls == 10
 
 
 @pytest.mark.parametrize("name", ["settings", "persona"])
