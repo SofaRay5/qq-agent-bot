@@ -2,11 +2,13 @@
 
 import asyncio
 import logging
+import sqlite3
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from html import escape
 from pathlib import Path
 from typing import Literal, cast
+from urllib.parse import urlencode
 
 from aiohttp import web
 from pydantic import ValidationError
@@ -40,6 +42,14 @@ from dashboard.views import (
     secret_field,
     select_field,
     textarea_field,
+)
+from memory.store import (
+    MemoryKind,
+    MemoryRecord,
+    MemoryScope,
+    MemorySource,
+    MemoryStore,
+    MemoryVersion,
 )
 
 COOKIE = "dashboard_session"
@@ -632,6 +642,243 @@ async def _persona_post(request: web.Request) -> web.Response:
     return _form_response(request, "人格", "/persona", _persona_fields(value), notice="保存成功。")
 
 
+def _positive_int(values: Mapping[str, object], name: str, *, optional: bool = False) -> int | None:
+    raw = str(values.get(name, "")).strip()
+    if optional and not raw:
+        return None
+    value = int(raw)
+    if value <= 0:
+        raise ValueError("Invalid positive integer")
+    return value
+
+
+def _memory_scope(values: Mapping[str, object]) -> MemoryScope:
+    kind = str(values.get("scope_kind", ""))
+    group_id = _positive_int(values, "group_id", optional=True)
+    user_id = _positive_int(values, "user_id", optional=True)
+    if kind == "private" and group_id is None and user_id is not None:
+        return MemoryScope.private(user_id)
+    if kind == "group_user" and group_id is not None and user_id is not None:
+        return MemoryScope.group_user(group_id, user_id)
+    if kind == "group_shared" and group_id is not None and user_id is None:
+        return MemoryScope.group_shared(group_id)
+    raise ValueError("Invalid memory scope")
+
+
+def _memory_kind(value: object) -> MemoryKind:
+    kind = str(value)
+    if kind not in {"fact", "preference", "quote"}:
+        raise ValueError("Invalid memory kind")
+    return cast(MemoryKind, kind)
+
+
+def _memory_form_fields(prefix: str = "") -> str:
+    return (
+        select_field(
+            "范围",
+            f"{prefix}scope_kind",
+            "private",
+            ("private", "group_user", "group_shared"),
+        )
+        + '<div class="grid">'
+        + input_field("群号（群范围填写）", f"{prefix}group_id", "", "number")
+        + input_field("QQ 号（个人范围填写）", f"{prefix}user_id", "", "number")
+        + "</div>"
+    )
+
+
+def _scope_text(scope: MemoryScope) -> str:
+    if scope.kind == "private":
+        return f"私聊用户 {scope.user_id}"
+    if scope.kind == "group_user":
+        return f"群 {scope.group_id} / 用户 {scope.user_id}"
+    return f"群 {scope.group_id} / 群共享"
+
+
+def _memory_record_html(
+    record: MemoryRecord, history: tuple[MemoryVersion, ...], csrf_token: str
+) -> str:
+    versions = "".join(
+        "<li>"
+        f"v{version.version} · 重要度 {version.importance} · "
+        f"{escape(version.created_at)}<br>{escape(version.content)}"
+        + (
+            f'<p class="hint">来源：{escape(version.source.excerpt)}</p>'
+            if version.source.excerpt
+            else ""
+        )
+        + "</li>"
+        for version in history
+    )
+    token = escape(csrf_token)
+    item_id = record.id
+    return (
+        f'<article class="card" data-memory-id="{item_id}">'
+        f"<h2>{escape(record.version.content)}</h2>"
+        f'<p class="hint">{escape(_scope_text(record.scope))} · '
+        f"{escape(record.kind)} · 重要度 {record.version.importance}</p>"
+        f"<details><summary>历史与来源</summary><ol>{versions}</ol></details>"
+        f'<details><summary>修改</summary><form method="post" action="/memory/edit">'
+        f'<input type="hidden" name="csrf_token" value="{token}">'
+        f'<input type="hidden" name="item_id" value="{item_id}">'
+        '<label>内容<textarea name="content" rows="3">'
+        f"{escape(record.version.content)}</textarea></label>"
+        f'<label>重要度<input type="number" name="importance" min="1" max="5" '
+        f'value="{record.version.importance}"></label>'
+        '<button type="submit">保存修改</button></form>'
+        f'<form method="post" action="/memory/copy"><input type="hidden" '
+        f'name="csrf_token" value="{token}"><input type="hidden" name="item_id" value="{item_id}">'
+        f'{_memory_form_fields("copy_")}<button type="submit">复制到新范围</button></form>'
+        f'<form method="post" action="/memory/delete"><input type="hidden" '
+        f'name="csrf_token" value="{token}"><input type="hidden" name="item_id" value="{item_id}">'
+        '<button type="submit">永久删除</button></form></details></article>'
+    )
+
+
+async def _memory_response(
+    request: web.Request, *, status: int = 200, notice: str = "", error: str = ""
+) -> web.Response:
+    session = _session(request)
+    assert session is not None
+    state = _state(request)
+    try:
+        values = request.query
+        scope_kind = str(values.get("scope_kind", ""))
+        scope = _memory_scope(values) if scope_kind else None
+        kind_value = str(values.get("kind", ""))
+        kind = _memory_kind(kind_value) if kind_value else None
+        query = str(values.get("q", ""))[:500]
+        page_number = int(str(values.get("page", "1")))
+        if page_number < 1:
+            raise ValueError
+        store = MemoryStore(state.root / "data" / "memory.db")
+        await store.initialize()
+        records = await store.list_current(
+            scope, kind, query, limit=51, offset=(page_number - 1) * 50
+        )
+        visible = records[:50]
+        histories = await asyncio.gather(*(store.history(record.id) for record in visible))
+    except (ValueError, KeyError):
+        status, error, visible, histories = 400, "筛选条件无效。", (), ()
+        page_number, query, scope_kind, kind_value = 1, "", "", ""
+    except (sqlite3.Error, OSError):
+        status, error, visible, histories = 500, "记忆暂时不可用，请稍后重试。", (), ()
+        page_number, query, scope_kind, kind_value = 1, "", "", ""
+
+    token = session.csrf_token
+    cards = (
+        "".join(
+            _memory_record_html(record, history, token)
+            for record, history in zip(visible, histories, strict=True)
+        )
+        or '<p class="card">没有符合条件的记忆。</p>'
+    )
+    filters = (
+        '<form method="get" action="/memory"><div class="grid">'
+        + select_field(
+            "范围", "scope_kind", scope_kind, ("", "private", "group_user", "group_shared")
+        )
+        + select_field("类型", "kind", kind_value, ("", "fact", "preference", "quote"))
+        + input_field("群号", "group_id", request.query.get("group_id", ""), "number")
+        + input_field("QQ 号", "user_id", request.query.get("user_id", ""), "number")
+        + input_field("搜索", "q", query)
+        + '</div><button type="submit">筛选</button></form>'
+    )
+    add = (
+        '<details class="card"><summary>手动添加记忆</summary>'
+        '<form method="post" action="/memory/add">'
+        f'<input type="hidden" name="csrf_token" value="{escape(token)}">'
+        + _memory_form_fields()
+        + select_field("类型", "kind", "fact", ("fact", "preference", "quote"))
+        + textarea_field("内容", "content", "")
+        + input_field("重要度（1–5）", "importance", 3, "number")
+        + '<button type="submit">添加</button></form></details>'
+    )
+    clear = (
+        '<details class="card"><summary>按范围清空</summary>'
+        '<form method="post" action="/memory/clear">'
+        f'<input type="hidden" name="csrf_token" value="{escape(token)}">'
+        + _memory_form_fields("clear_")
+        + input_field("输入“确认清空”", "confirmation", "")
+        + '<button type="submit">永久清空</button></form></details>'
+    )
+    params = {key: value for key, value in request.query.items() if key != "page"}
+    pages = ""
+    if page_number > 1:
+        pages += f'<a href="/memory?{urlencode({**params, "page": page_number - 1})}">上一页</a> '
+    if len(records) > 50:
+        pages += f'<a href="/memory?{urlencode({**params, "page": page_number + 1})}">下一页</a>'
+    feedback = (f'<p class="error" role="alert">{escape(error)}</p>' if error else "") + (
+        f'<p class="notice" role="status">{escape(notice)}</p>' if notice else ""
+    )
+    body = (
+        navigation(token, "/memory")
+        + "<h1>长期记忆</h1>"
+        + feedback
+        + filters
+        + add
+        + cards
+        + f"<p>{pages}</p>"
+        + clear
+    )
+    return web.Response(status=status, text=page("记忆", body), content_type="text/html")
+
+
+async def _memory_get(request: web.Request) -> web.Response:
+    return await _memory_response(request)
+
+
+async def _memory_mutation(request: web.Request) -> web.Response:
+    state = _state(request)
+    form = await request.post()
+    action = request.match_info["action"]
+    store = MemoryStore(state.root / "data" / "memory.db")
+    try:
+        await store.initialize()
+        if action == "add":
+            await store.create(
+                _memory_scope(form),
+                _memory_kind(form.get("kind", "")),
+                str(form.get("content", "")).strip(),
+                cast(int, _positive_int(form, "importance")),
+                MemorySource(),
+                "manual",
+            )
+        elif action == "edit":
+            await store.update(
+                cast(int, _positive_int(form, "item_id")),
+                str(form.get("content", "")).strip(),
+                cast(int, _positive_int(form, "importance")),
+                MemorySource(),
+                "edit",
+            )
+        elif action == "copy":
+            copy_values = {
+                "scope_kind": form.get("copy_scope_kind", ""),
+                "group_id": form.get("copy_group_id", ""),
+                "user_id": form.get("copy_user_id", ""),
+            }
+            await store.copy(cast(int, _positive_int(form, "item_id")), _memory_scope(copy_values))
+        elif action == "delete":
+            await store.delete(cast(int, _positive_int(form, "item_id")))
+        elif action == "clear":
+            if form.get("confirmation") != "确认清空":
+                raise ValueError("Confirmation required")
+            clear_values = {
+                "scope_kind": form.get("clear_scope_kind", ""),
+                "group_id": form.get("clear_group_id", ""),
+                "user_id": form.get("clear_user_id", ""),
+            }
+            await store.clear(_memory_scope(clear_values))
+        else:
+            raise ValueError("Invalid memory action")
+    except (ValueError, KeyError):
+        return await _memory_response(request, status=400, error="操作无效，请检查字段。")
+    except (sqlite3.Error, OSError):
+        return await _memory_response(request, status=500, error="保存失败，请稍后重试。")
+    return await _memory_response(request, notice="操作成功。")
+
+
 def create_app(root: Path, manager: BotManager) -> web.Application:
     app = web.Application(client_max_size=65_536, middlewares=[_errors, _security])
     app[STATE] = DashboardState(root, manager, AuthStore(root), SessionStore(), LoginThrottle())
@@ -649,4 +896,6 @@ def create_app(root: Path, manager: BotManager) -> web.Application:
     app.router.add_post("/models", _models_post)
     app.router.add_get("/persona", _persona_get)
     app.router.add_post("/persona", _persona_post)
+    app.router.add_get("/memory", _memory_get)
+    app.router.add_post("/memory/{action:add|edit|copy|delete|clear}", _memory_mutation)
     return app

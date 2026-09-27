@@ -292,23 +292,23 @@ git commit -m "feat: simplify dashboard model settings"
 - Consumes: Task 1 administration methods and existing dashboard auth/CSRF state.
 - Produces authenticated `/memory` list/filter, add, edit, copy, delete and clear flows.
 
-- [ ] **Step 1: Write failing memory-page read tests.**
+- [x] **Step 1: Write failing memory-page read tests.**
 
 Assert authenticated owners can filter by exact scope/type and search current content, expand escaped history/source excerpts, and paginate deterministically at 50 items per page. Unauthenticated access redirects; no page contains other scopes when an exact filter is selected, secrets, full paths or model raw output.
 
-- [ ] **Step 2: Implement the read-only memory page.**
+- [x] **Step 2: Implement the read-only memory page.**
 
 Add “记忆” to shared navigation. Use normal forms and `details`; do not add client-side data fetching.
 
-- [ ] **Step 3: Write failing mutation and security tests.**
+- [x] **Step 3: Write failing mutation and security tests.**
 
 Assert CSRF is required for add/edit/copy/delete/clear; edit creates a version; copy creates a new target-scope item; delete removes the chain; clear requires the exact phrase `确认清空` and affects only the selected scope. Invalid IDs, negative IDs, cross-scope targets, oversized content and failed SQLite transactions preserve prior data and return safe field errors.
 
-- [ ] **Step 4: Implement owner mutations.**
+- [x] **Step 4: Implement owner mutations.**
 
 Persist first, then render the result. Never expose SQL errors or deleted content in response messages.
 
-- [ ] **Step 5: Verify and commit Task 10.7.**
+- [x] **Step 5: Verify and commit Task 10.7.**
 
 Run: `uv run pytest tests/test_dashboard_memory.py tests/test_dashboard_app.py tests/test_memory_store.py -q`
 

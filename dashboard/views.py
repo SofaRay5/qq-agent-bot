@@ -52,6 +52,7 @@ def navigation(csrf_token: str, current: str = "") -> str:
         ("/settings", "行为"),
         ("/models", "模型与连接"),
         ("/persona", "人格"),
+        ("/memory", "记忆"),
     )
     items = "".join(
         f'<a href="{path}"{" aria-current=" + chr(34) + "page" + chr(34) if path == current else ""}>{label}</a>'
