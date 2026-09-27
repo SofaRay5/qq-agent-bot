@@ -12,6 +12,8 @@ from agent.image_fetch import ImageDownloadError
 from agent.vision import VisionDescriber
 from config.models import Settings
 from core.groupmate import GroupmateCoordinator, GroupmateRuntime
+from memory.extractor import MemoryCandidate
+from memory.store import MemoryContext
 from onebot_adapter.event import GroupMessageEvent, PrivateMessageEvent
 
 
@@ -115,6 +117,7 @@ class ReplyCall:
     current: str
     mode: ReplyMode
     budget_kind: str
+    memories: tuple[str, ...] = ()
 
 
 class FakeReply:
@@ -128,8 +131,9 @@ class FakeReply:
         current: str,
         mode: ReplyMode,
         budget_kind: str,
+        memories: Sequence[str] = (),
     ) -> str | None:
-        self.calls.append(ReplyCall(tuple(history), current, mode, budget_kind))
+        self.calls.append(ReplyCall(tuple(history), current, mode, budget_kind, tuple(memories)))
         response = self.responses.pop(0) if self.responses else "回复"
         if isinstance(response, BaseException):
             raise response
@@ -149,8 +153,9 @@ class BlockingReply(FakeReply):
         current: str,
         mode: ReplyMode,
         budget_kind: str,
+        memories: Sequence[str] = (),
     ) -> str | None:
-        self.calls.append(ReplyCall(tuple(history), current, mode, budget_kind))
+        self.calls.append(ReplyCall(tuple(history), current, mode, budget_kind, tuple(memories)))
         if self.blocked_text in current:
             self.started.set()
             await self.release.wait()
@@ -201,6 +206,30 @@ class SendRecorder:
         return self.next_id
 
 
+class FakeExtract:
+    def __init__(self, errors: list[BaseException | None] | None = None) -> None:
+        self.errors = errors or []
+        self.calls: list[tuple[MemoryCandidate, ...]] = []
+        self.called = asyncio.Event()
+
+    async def __call__(self, candidates: tuple[MemoryCandidate, ...]) -> None:
+        self.calls.append(candidates)
+        self.called.set()
+        error = self.errors.pop(0) if self.errors else None
+        if error is not None:
+            raise error
+
+
+class ControlledDelay:
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def __call__(self, _seconds: float) -> None:
+        self.started.set()
+        await self.release.wait()
+
+
 def coordinator(
     reply: FakeReply,
     *,
@@ -210,6 +239,9 @@ def coordinator(
     random_value: Callable[[], float] = lambda: 0.0,
     sleep: Callable[[float], Awaitable[None]] | None = None,
     resolve_image: Callable[[str], Awaitable[str]] | None = None,
+    recall: Callable[[MemoryContext, str], Awaitable[tuple[str, ...]]] | None = None,
+    extract: Callable[[tuple[MemoryCandidate, ...]], Awaitable[None]] | None = None,
+    extraction_delay: Callable[[float], Awaitable[None]] = asyncio.sleep,
 ) -> GroupmateCoordinator:
     active_clock = clock or Clock()
     return GroupmateCoordinator(
@@ -221,7 +253,171 @@ def coordinator(
         now=active_clock.now,
         random_value=random_value,
         sleep=sleep or active_clock.sleep,
+        recall=recall,
+        extract=extract,
+        extraction_delay=extraction_delay,
     )
+
+
+@pytest.mark.asyncio
+async def test_recall_uses_private_and_group_user_contexts() -> None:
+    calls: list[tuple[MemoryContext, str]] = []
+
+    async def recall(context: MemoryContext, query: str) -> tuple[str, ...]:
+        calls.append((context, query))
+        return ("记忆内容",)
+
+    reply = FakeReply()
+    bot = coordinator(reply, recall=recall)
+    send = SendRecorder()
+
+    await bot.handle(private_event("你好", user_id=7), send)
+    await bot.handle(group_event("小薯你好", group_id=9, user_id=8), send)
+
+    assert calls[0][0] == MemoryContext.private(7)
+    assert calls[1][0] == MemoryContext.group(9, 8)
+    assert "你好" in calls[0][1]
+    assert reply.calls[0].memories == ("记忆内容",)
+    assert reply.calls[1].memories == ("记忆内容",)
+
+
+@pytest.mark.asyncio
+async def test_recall_failure_is_safe_and_chat_continues(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    secret = "数据库私密错误"
+
+    async def recall(_context: MemoryContext, _query: str) -> tuple[str, ...]:
+        raise RuntimeError(secret)
+
+    reply = FakeReply()
+    bot = coordinator(reply, recall=recall)
+
+    with caplog.at_level(logging.ERROR, logger="core.groupmate"):
+        await bot.handle(private_event("你好"), SendRecorder())
+
+    assert reply.calls[0].memories == ()
+    assert "RuntimeError" in caplog.text
+    assert secret not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_only_successfully_sent_generated_replies_submit_candidates() -> None:
+    async def no_delay(_seconds: float) -> None:
+        return None
+
+    extracted = FakeExtract()
+    bot = coordinator(FakeReply(["成功"]), extract=extracted, extraction_delay=no_delay)
+    await bot.handle(private_event("我喜欢草莓蛋糕"), SendRecorder())
+    await asyncio.wait_for(extracted.called.wait(), 1)
+    await bot.close()
+    assert extracted.calls[0][0].text == "我喜欢草莓蛋糕"
+
+    for response in (None, RuntimeError("provider failed")):
+        skipped = FakeExtract()
+        bot = coordinator(FakeReply([response]), extract=skipped, extraction_delay=no_delay)
+        await bot.handle(private_event("我喜欢草莓蛋糕"), SendRecorder())
+        await bot.close()
+        assert skipped.calls == []
+
+    skipped = FakeExtract()
+    failed_send = SendRecorder()
+    failed_send.fail_once = True
+    bot = coordinator(FakeReply(["成功"]), extract=skipped, extraction_delay=no_delay)
+    with pytest.raises(ConnectionError, match="send failed"):
+        await bot.handle(private_event("我喜欢草莓蛋糕"), failed_send)
+    await bot.close()
+    assert skipped.calls == []
+
+
+@pytest.mark.asyncio
+async def test_same_scope_batches_at_most_three_candidates() -> None:
+    delay = ControlledDelay()
+    extracted = FakeExtract()
+    bot = coordinator(FakeReply(), extract=extracted, extraction_delay=delay)
+
+    await bot.handle(private_event("我喜欢草莓蛋糕", message_id=1), SendRecorder())
+    await asyncio.wait_for(delay.started.wait(), 1)
+    await bot.handle(private_event("我喜欢咖啡", message_id=2), SendRecorder())
+    await bot.handle(private_event("我喜欢电影", message_id=3), SendRecorder())
+    await bot.handle(private_event("我喜欢音乐", message_id=4), SendRecorder())
+    delay.release.set()
+    await asyncio.wait_for(extracted.called.wait(), 1)
+
+    assert [item.text for item in extracted.calls[0]] == [
+        "我喜欢草莓蛋糕",
+        "我喜欢咖啡",
+        "我喜欢电影",
+    ]
+    await bot.close()
+
+
+@pytest.mark.asyncio
+async def test_queue_saturation_skips_new_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(groupmate_module, "EXTRACTION_QUEUE_SIZE", 1)
+    delay = ControlledDelay()
+    extracted = FakeExtract()
+    bot = coordinator(FakeReply(), extract=extracted, extraction_delay=delay)
+
+    await bot.handle(private_event("我喜欢第一项", message_id=1), SendRecorder())
+    await asyncio.wait_for(delay.started.wait(), 1)
+    await bot.handle(private_event("我喜欢第二项", message_id=2), SendRecorder())
+    await bot.handle(private_event("我喜欢第三项", message_id=3), SendRecorder())
+    delay.release.set()
+    await asyncio.wait_for(extracted.called.wait(), 1)
+
+    assert [item.text for item in extracted.calls[0]] == ["我喜欢第一项", "我喜欢第二项"]
+    await bot.close()
+
+
+@pytest.mark.asyncio
+async def test_extraction_failure_does_not_stop_later_batches() -> None:
+    async def no_delay(_seconds: float) -> None:
+        return None
+
+    extracted = FakeExtract([RuntimeError("private failure"), None])
+    bot = coordinator(FakeReply(), extract=extracted, extraction_delay=no_delay)
+
+    await bot.handle(private_event("我喜欢第一项", message_id=1), SendRecorder())
+    await asyncio.wait_for(extracted.called.wait(), 1)
+    extracted.called.clear()
+    await bot.handle(private_event("我喜欢第二项", message_id=2), SendRecorder())
+    await asyncio.wait_for(extracted.called.wait(), 1)
+
+    assert len(extracted.calls) == 2
+    await bot.close()
+
+
+@pytest.mark.asyncio
+async def test_close_finishes_active_extraction_and_drops_pending() -> None:
+    class BlockingExtract(FakeExtract):
+        def __init__(self) -> None:
+            super().__init__()
+            self.release = asyncio.Event()
+
+        async def __call__(self, candidates: tuple[MemoryCandidate, ...]) -> None:
+            self.calls.append(candidates)
+            self.called.set()
+            await self.release.wait()
+
+    async def no_delay(_seconds: float) -> None:
+        return None
+
+    extracted = BlockingExtract()
+    bot = coordinator(FakeReply(), extract=extracted, extraction_delay=no_delay)
+    await bot.handle(private_event("我喜欢第一项", message_id=1), SendRecorder())
+    await asyncio.wait_for(extracted.called.wait(), 1)
+    await bot.handle(private_event("我喜欢第二项", message_id=2), SendRecorder())
+
+    closing = asyncio.create_task(bot.close())
+    await asyncio.sleep(0)
+    assert not closing.done()
+    extracted.release.set()
+    await closing
+
+    assert len(extracted.calls) == 1
 
 
 @pytest.mark.asyncio

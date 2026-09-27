@@ -18,10 +18,14 @@ from agent.groupmate import (
 from agent.image_fetch import ImageDownloadError
 from agent.vision import VisionDescriber
 from config.models import Settings
+from memory.extractor import MemoryCandidate, should_extract
+from memory.store import MemoryContext, MemoryScope, MemorySource
 from onebot_adapter.event import GroupMessageEvent, PrivateMessageEvent
 from onebot_adapter.message import MessageContent, content_for_event
 
 MODEL_TIMEOUT_SECONDS = 30.0
+EXTRACTION_BATCH_SECONDS = 30.0
+EXTRACTION_QUEUE_SIZE = 32
 FALLBACK_REPLY = "暂时无法回复，请稍后再试"
 TOTAL_BUDGET_REPLY = "今天的聊天额度用完了，明天再聊吧"
 VISION_BUDGET_REPLY = "今天暂时不能识图了"
@@ -30,6 +34,8 @@ logger = logging.getLogger(__name__)
 
 Send = Callable[[str], Awaitable[int | None]]
 ResolveImage = Callable[[str], Awaitable[str]]
+RecallMemory = Callable[[MemoryContext, str], Awaitable[tuple[str, ...]]]
+ExtractMemory = Callable[[tuple[MemoryCandidate, ...]], Awaitable[None]]
 
 
 @dataclass
@@ -49,6 +55,8 @@ class GroupmateRuntime:
     persona_name: str
     reply: GroupmateReply
     vision: VisionDescriber | None
+    recall: RecallMemory | None = None
+    extract: ExtractMemory | None = None
 
 
 class GroupmateCoordinator:
@@ -63,13 +71,22 @@ class GroupmateCoordinator:
         now: Callable[[], float] = time.monotonic,
         random_value: Callable[[], float] = random.random,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        recall: RecallMemory | None = None,
+        extract: ExtractMemory | None = None,
+        extraction_delay: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
-        self._runtime = GroupmateRuntime(settings, persona_name, reply, vision)
+        self._runtime = GroupmateRuntime(settings, persona_name, reply, vision, recall, extract)
         self._resolve_image = resolve_image
         self._now = now
         self._random_value = random_value
         self._sleep = sleep
         self._states: dict[tuple[str, int], SessionState] = {}
+        self._extraction_delay = extraction_delay
+        self._extraction_pending: deque[MemoryCandidate] = deque()
+        self._extraction_event = asyncio.Event()
+        self._extraction_task: asyncio.Task[None] | None = None
+        self._extracting = False
+        self._closing = False
 
     async def handle(
         self,
@@ -93,6 +110,94 @@ class GroupmateCoordinator:
             else ("group", event.group_id)
         )
         return self._states.setdefault(key, SessionState())
+
+    def _memory_context(
+        self, event: PrivateMessageEvent | GroupMessageEvent
+    ) -> MemoryContext:
+        if isinstance(event, GroupMessageEvent):
+            return MemoryContext.group(event.group_id, event.user_id)
+        return MemoryContext.private(event.user_id)
+
+    def _memory_scope(
+        self, event: PrivateMessageEvent | GroupMessageEvent, text: str
+    ) -> MemoryScope:
+        if not isinstance(event, GroupMessageEvent):
+            return MemoryScope.private(event.user_id)
+        if any(marker in text for marker in ("我们群", "群约定", "大家约定")):
+            return MemoryScope.group_shared(event.group_id)
+        return MemoryScope.group_user(event.group_id, event.user_id)
+
+    def _queue_extraction(
+        self,
+        runtime: GroupmateRuntime,
+        event: PrivateMessageEvent | GroupMessageEvent,
+        content: MessageContent,
+    ) -> None:
+        text = (content.text or "")[: runtime.settings.context_max_characters]
+        if (
+            runtime.extract is None
+            or self._closing
+            or not should_extract(text)
+            or len(self._extraction_pending) >= EXTRACTION_QUEUE_SIZE
+        ):
+            return
+        self._extraction_pending.append(
+            MemoryCandidate(
+                scope=self._memory_scope(event, text),
+                text=text,
+                source=MemorySource(
+                    message_id=str(event.message_id),
+                    message_time=event.time,
+                    excerpt=text[:300],
+                ),
+            )
+        )
+        self._extraction_event.set()
+        if self._extraction_task is None or self._extraction_task.done():
+            self._extraction_task = asyncio.create_task(self._extraction_worker())
+
+    async def _extraction_worker(self) -> None:
+        while not self._closing:
+            if not self._extraction_pending:
+                self._extraction_event.clear()
+                await self._extraction_event.wait()
+                continue
+            first = self._extraction_pending.popleft()
+            await self._extraction_delay(EXTRACTION_BATCH_SECONDS)
+            if self._closing:
+                return
+            batch = [first]
+            deferred: deque[MemoryCandidate] = deque()
+            while self._extraction_pending:
+                item = self._extraction_pending.popleft()
+                if item.scope == first.scope and len(batch) < 3:
+                    batch.append(item)
+                else:
+                    deferred.append(item)
+            self._extraction_pending.extend(deferred)
+            extract = self._runtime.extract
+            if extract is None:
+                continue
+            self._extracting = True
+            try:
+                await extract(tuple(batch))
+            except Exception as exc:
+                logger.error("memory extraction failed: %s", type(exc).__name__)
+            finally:
+                self._extracting = False
+
+    async def close(self) -> None:
+        """Finish the active extraction and discard queued raw candidates."""
+        self._closing = True
+        self._extraction_pending.clear()
+        self._extraction_event.set()
+        task = self._extraction_task
+        if task is None:
+            return
+        if not self._extracting:
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        self._extraction_task = None
 
     def _deactivate(self, state: SessionState) -> None:
         state.history.clear()
@@ -288,8 +393,16 @@ class GroupmateCoordinator:
                     )
                 current = self._current(runtime, event, content, caption)
                 stage = "reply"
+            memories: tuple[str, ...] = ()
+            if runtime.recall is not None:
+                try:
+                    memories = await runtime.recall(self._memory_context(event), current)
+                except Exception as exc:
+                    logger.error("memory recall failed: %s", type(exc).__name__)
             answer = await asyncio.wait_for(
-                runtime.reply(tuple(state.history), current, mode, budget_kind),
+                runtime.reply(
+                    tuple(state.history), current, mode, budget_kind, memories=memories
+                ),
                 timeout=MODEL_TIMEOUT_SECONDS,
             )
         except BudgetExceeded as exc:
@@ -346,3 +459,4 @@ class GroupmateCoordinator:
             count_window_reply=count_window,
             delayed=True,
         )
+        self._queue_extraction(runtime, event, content)

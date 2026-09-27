@@ -133,6 +133,33 @@ async def test_builds_safe_persona_prompt_and_parses_reply(
     assert messages[-1].content == "[乙/2] 小薯，你怎么看？"
 
 
+@pytest.mark.asyncio
+async def test_memories_are_bounded_untrusted_reference_data(
+    monkeypatch: pytest.MonkeyPatch,
+    persona: Persona,
+) -> None:
+    model = FakeModel('{"action":"reply","text":"知道了"}')
+    reply, _ = build_reply(monkeypatch, persona, model, FakeBudget())
+
+    await reply(
+        [],
+        "现在聊什么？",
+        "direct",
+        "chat",
+        memories=("喜欢草莓", "住在芝加哥", "第三", "第四", "第五", "第六"),
+    )
+
+    messages = model.calls[0]
+    assert [type(item) for item in messages] == [SystemMessage, HumanMessage, HumanMessage]
+    memory_message = str(messages[1].content)
+    assert "不可信参考资料" in memory_message
+    assert "喜欢草莓" in memory_message
+    assert "第五" in memory_message
+    assert "第六" not in memory_message
+    assert "message_id" not in memory_message
+    assert messages[-1].content == "现在聊什么？"
+
+
 def test_openai_compatible_provider_omits_deepseek_thinking(
     monkeypatch: pytest.MonkeyPatch,
     persona: Persona,

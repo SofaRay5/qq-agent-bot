@@ -173,23 +173,23 @@ git commit -m "feat: extract safe atomic memories"
 - `GroupmateCoordinator(..., extraction_delay: Callable[[float], Awaitable[None]] = asyncio.sleep)` uses the injected delay for deterministic batching tests.
 - Produces `GroupmateCoordinator.close() -> Awaitable[None]` to finish the active extraction write and drop queued candidates.
 
-- [ ] **Step 1: Write failing prompt and recall tests.**
+- [x] **Step 1: Write failing prompt and recall tests.**
 
 Assert up to 5 memory strings are placed in a separate low-privilege `HumanMessage` labeled untrusted; source excerpts and metadata are absent; no memory message is added for an empty result. Assert private recall uses only the private context and group recall passes the current group plus sender.
 
-- [ ] **Step 2: Implement per-message recall and prompt injection.**
+- [x] **Step 2: Implement per-message recall and prompt injection.**
 
 Recall after trigger selection and before the chat model call. A recall exception logs only its class/category and continues with an empty memory list.
 
-- [ ] **Step 3: Write failing post-send extraction and queue tests.**
+- [x] **Step 3: Write failing post-send extraction and queue tests.**
 
 Assert only successful generated replies submit candidates; silence, fixed errors and failed sends do not. With a fake `extraction_delay`, assert the same scope batches at most 3 candidates within 30 seconds without waiting in real time. Assert the queue is bounded, saturation skips new work, extraction failures do not affect later messages, and close drops queued raw text after finishing the active write.
 
-- [ ] **Step 4: Implement one bounded extraction worker in the coordinator.**
+- [x] **Step 4: Implement one bounded extraction worker in the coordinator.**
 
 Keep raw candidates only in memory. Start lazily on first candidate, serialize extraction, and preserve existing per-session message ordering and short-term history.
 
-- [ ] **Step 5: Verify and commit Task 10.4.**
+- [x] **Step 5: Verify and commit Task 10.4.**
 
 Run: `uv run pytest tests/test_groupmate_reply.py tests/test_groupmate.py -q`
 
