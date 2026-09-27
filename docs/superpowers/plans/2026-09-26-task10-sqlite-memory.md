@@ -254,23 +254,23 @@ git commit -m "feat: assemble persistent bot memory"
 - Consumes: Task 2 resolved provider semantics.
 - Produces: primary model form, optional independent memory form, collapsed optional vision form, vision-key reuse, and shared accessible page styles.
 
-- [ ] **Step 1: Write failing simplified-form tests.**
+- [x] **Step 1: Write failing simplified-form tests.**
 
 Assert the primary API config appears once; memory override fields are collapsed, disabled and not required while following the primary model; vision fields are collapsed/disabled until enabled; DeepSeek fills server-side defaults; following/reusing providers preserves existing keys; blank inputs do not erase secrets; explicit clear remains available.
 
-- [ ] **Step 2: Implement form parsing and persistence before runtime update.**
+- [x] **Step 2: Implement form parsing and persistence before runtime update.**
 
 Keep no-JavaScript submission functional. Use a few lines of native JavaScript only to toggle optional fieldsets; do not add a frontend dependency or build step.
 
-- [ ] **Step 3: Write failing layout and accessibility tests.**
+- [x] **Step 3: Write failing layout and accessibility tests.**
 
 Assert one responsive stylesheet, visible current navigation, labels for every control, field-level errors, success notices, keyboard-usable `details` sections, escaped persona/config text and no secret values in HTML.
 
-- [ ] **Step 4: Implement the shared visual refresh.**
+- [x] **Step 4: Implement the shared visual refresh.**
 
 Use CSS variables, cards, responsive grids and native `details`; keep all pages server-rendered and under the existing 65,536-byte request limit.
 
-- [ ] **Step 5: Verify and commit Task 10.6.**
+- [x] **Step 5: Verify and commit Task 10.6.**
 
 Run: `uv run pytest tests/test_dashboard_app.py tests/test_private_config.py -q`
 

@@ -245,7 +245,7 @@ async def _status_response(
         or "<li>无</li>"
     )
     body = (
-        navigation(session.csrf_token)
+        navigation(session.csrf_token, "/")
         + "<h1>状态</h1>"
         + (f'<p class="notice">{escape(notice)}</p>' if notice else "")
         + (f'<p class="error">{escape(error)}</p>' if error else "")
@@ -280,15 +280,20 @@ async def _stop(request: web.Request) -> web.Response:
 
 
 def _form_response(
-    request: web.Request, title: str, action: str, fields: str, error: str = ""
+    request: web.Request,
+    title: str,
+    action: str,
+    fields: str,
+    error: str = "",
+    notice: str = "",
 ) -> web.Response:
     session = _session(request)
     assert session is not None
     return web.Response(
         text=page(
             title,
-            navigation(session.csrf_token)
-            + form_fragment(title, action, session.csrf_token, fields, error),
+            navigation(session.csrf_token, action)
+            + form_fragment(title, action, session.csrf_token, fields, error, notice),
         ),
         status=400 if error else 200,
         content_type="text/html",
@@ -379,63 +384,95 @@ async def _settings_post(request: web.Request) -> web.Response:
             _settings_fields_from_form(form),
             "设置无效，请检查字段",
         )
-    return _form_response(request, "行为设置", "/settings", _settings_fields(value))
+    return _form_response(
+        request, "行为设置", "/settings", _settings_fields(value), notice="保存成功。"
+    )
 
 
-def _models_fields(value: PrivateSettings) -> str:
+def _models_fields(value: PrivateSettings, form: Mapping[str, object] | None = None) -> str:
+    def field(name: str, fallback: str) -> str:
+        return str(form.get(name, fallback)) if form is not None else fallback
+
+    memory = value.memory or value.chat
+    follows_chat = (
+        form.get("memory_follow_primary") == "on" if form is not None else value.memory is None
+    )
+    vision_enabled = (
+        form.get("vision_enabled") == "on" if form is not None else value.vision_enabled
+    )
+    reuses_key = (
+        form.get("vision_reuse_chat_api_key") == "on"
+        if form is not None
+        else value.vision_reuse_chat_api_key
+    )
+    memory_disabled = " disabled" if follows_chat else ""
+    vision_disabled = "" if vision_enabled else " disabled"
     return (
-        input_field("NapCat WebSocket 地址", "napcat_ws_url", value.napcat_ws_url)
-        + secret_field("NapCat Token", "napcat_access_token", bool(value.napcat_access_token))
-        + "<h2>聊天模型</h2>"
-        + select_field(
-            "服务", "chat_provider", value.chat.provider, ("deepseek", "openai_compatible")
+        '<section class="card"><h2>NapCat 连接</h2>'
+        + input_field(
+            "NapCat WebSocket 地址", "napcat_ws_url", field("napcat_ws_url", value.napcat_ws_url)
         )
-        + input_field("API 地址", "chat_base_url", value.chat.base_url)
-        + input_field("模型名", "chat_model", value.chat.model)
+        + secret_field("NapCat Token", "napcat_access_token", bool(value.napcat_access_token))
+        + "</section><section class=card><h2>主模型</h2><div class=grid>"
+        + select_field(
+            "服务",
+            "chat_provider",
+            field("chat_provider", value.chat.provider),
+            ("deepseek", "openai_compatible"),
+        )
+        + input_field("API 地址", "chat_base_url", field("chat_base_url", value.chat.base_url))
+        + input_field("模型名", "chat_model", field("chat_model", value.chat.model))
         + secret_field("API Key", "chat_api_key", bool(value.chat.api_key))
-        + "<h2>识图模型</h2>"
-        + checkbox_field("启用识图", "vision_enabled", value.vision_enabled)
+        + '</div></section><details class="card optional"'
+        + (" open" if not follows_chat else "")
+        + "><summary>记忆模型（默认跟随主模型）</summary>"
+        + checkbox_field(
+            "跟随主模型",
+            "memory_follow_primary",
+            follows_chat,
+            toggle="memory_provider_fields",
+            invert=True,
+        )
+        + f'<fieldset id="memory_provider_fields"{memory_disabled}><div class=grid>'
+        + select_field(
+            "服务",
+            "memory_provider",
+            field("memory_provider", memory.provider),
+            ("deepseek", "openai_compatible"),
+        )
+        + input_field("API 地址", "memory_base_url", field("memory_base_url", memory.base_url))
+        + input_field("模型名", "memory_model", field("memory_model", memory.model))
+        + secret_field("API Key", "memory_api_key", bool(memory.api_key))
+        + '</div></fieldset></details><details class="card optional"'
+        + (" open" if vision_enabled else "")
+        + "><summary>识图模型（可选）</summary>"
+        + checkbox_field(
+            "启用识图", "vision_enabled", vision_enabled, toggle="vision_provider_fields"
+        )
+        + f'<fieldset id="vision_provider_fields"{vision_disabled}>'
+        + checkbox_field(
+            "复用主模型 API Key",
+            "vision_reuse_chat_api_key",
+            reuses_key,
+        )
+        + "<div class=grid>"
         + select_field(
             "服务",
             "vision_provider",
-            value.vision.provider,
+            field("vision_provider", value.vision.provider),
             ("deepseek", "openai_compatible"),
         )
-        + input_field("API 地址", "vision_base_url", value.vision.base_url)
-        + input_field("模型名", "vision_model", value.vision.model)
+        + input_field(
+            "API 地址", "vision_base_url", field("vision_base_url", value.vision.base_url)
+        )
+        + input_field("模型名", "vision_model", field("vision_model", value.vision.model))
         + secret_field("API Key", "vision_api_key", bool(value.vision.api_key))
+        + "</div></fieldset></details>"
     )
 
 
 def _models_fields_from_form(form: Mapping[str, object], current: PrivateSettings) -> str:
-    def value(name: str, fallback: str) -> str:
-        return str(form.get(name, fallback))
-
-    return (
-        input_field("NapCat WebSocket 地址", "napcat_ws_url", value("napcat_ws_url", ""))
-        + secret_field("NapCat Token", "napcat_access_token", bool(current.napcat_access_token))
-        + "<h2>聊天模型</h2>"
-        + select_field(
-            "服务",
-            "chat_provider",
-            value("chat_provider", current.chat.provider),
-            ("deepseek", "openai_compatible"),
-        )
-        + input_field("API 地址", "chat_base_url", value("chat_base_url", ""))
-        + input_field("模型名", "chat_model", value("chat_model", ""))
-        + secret_field("API Key", "chat_api_key", bool(current.chat.api_key))
-        + "<h2>识图模型</h2>"
-        + checkbox_field("启用识图", "vision_enabled", form.get("vision_enabled") == "on")
-        + select_field(
-            "服务",
-            "vision_provider",
-            value("vision_provider", current.vision.provider),
-            ("deepseek", "openai_compatible"),
-        )
-        + input_field("API 地址", "vision_base_url", value("vision_base_url", ""))
-        + input_field("模型名", "vision_model", value("vision_model", ""))
-        + secret_field("API Key", "vision_api_key", bool(current.vision.api_key))
-    )
+    return _models_fields(current, form)
 
 
 def _secret(form: Mapping[str, object], name: str, current: str) -> str:
@@ -480,7 +517,11 @@ async def _models_post(request: web.Request) -> web.Response:
             napcat_ws_url=str(form.get("napcat_ws_url", "")),
             napcat_access_token=_secret(form, "napcat_access_token", current.napcat_access_token),
             chat=_provider(form, "chat", current.chat),
+            memory=None
+            if form.get("memory_follow_primary") == "on" or "memory_provider" not in form
+            else _provider(form, "memory", current.memory or current.chat),
             vision_enabled=form.get("vision_enabled") == "on",
+            vision_reuse_chat_api_key=form.get("vision_reuse_chat_api_key") == "on",
             vision=_provider(form, "vision", current.vision),
         )
         restart = (value.napcat_ws_url, value.napcat_access_token) != (
@@ -497,8 +538,10 @@ async def _models_post(request: web.Request) -> web.Response:
     except (ValueError, ValidationError):
         fields = _models_fields_from_form(form, current) if current is not None else ""
         return _form_response(request, "模型与连接", "/models", fields, "设置无效，请检查字段")
-    notice = "<p class=notice>NapCat 设置已变更，请重启机器人。</p>" if restart else ""
-    return _form_response(request, "模型与连接", "/models", notice + _models_fields(value))
+    notice = "保存成功。"
+    if restart:
+        notice += " NapCat 设置已变更，请重启机器人。"
+    return _form_response(request, "模型与连接", "/models", _models_fields(value), notice=notice)
 
 
 def _persona_fields(value: Persona) -> str:
@@ -586,7 +629,7 @@ async def _persona_post(request: web.Request) -> web.Response:
             _persona_fields_from_form(form),
             "设置无效，请检查字段",
         )
-    return _form_response(request, "人格", "/persona", _persona_fields(value))
+    return _form_response(request, "人格", "/persona", _persona_fields(value), notice="保存成功。")
 
 
 def create_app(root: Path, manager: BotManager) -> web.Application:

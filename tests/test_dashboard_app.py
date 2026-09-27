@@ -288,6 +288,123 @@ def model_form(token: str, **changes: str) -> dict[str, str]:
     return fields
 
 
+async def test_model_form_collapses_optional_providers_and_marks_current_page(
+    authenticated: tuple[TestClient, FakeManager, Path],
+) -> None:
+    client, _, _ = authenticated
+
+    text = await (await client.get("/models")).text()
+
+    assert text.count('name="chat_provider"') == 1
+    assert '<details class="card optional"' in text
+    assert 'name="memory_follow_primary" checked' in text
+    assert 'name="memory_provider"' in text
+    assert 'name="vision_enabled" checked' in text
+    assert 'name="vision_reuse_chat_api_key"' in text
+    assert 'aria-current="page">模型与连接</a>' in text
+    assert "@media" in text
+    assert text.count("<style>") == 1
+    assert "<script>" in text
+
+
+async def test_shared_pages_show_navigation_labels_and_safe_feedback(
+    authenticated: tuple[TestClient, FakeManager, Path],
+) -> None:
+    client, _, _ = authenticated
+    for route, title in (
+        ("/", "状态"),
+        ("/settings", "行为"),
+        ("/models", "模型与连接"),
+        ("/persona", "人格"),
+    ):
+        text = await (await client.get(route)).text()
+        assert f'aria-current="page">{title}</a>' in text
+        assert text.count("<style>") == 1
+
+    settings = await client.get("/settings")
+    response = await client.post(
+        "/settings",
+        data=settings_form(csrf(await settings.text()), continuous_window_seconds="bad"),
+    )
+    assert 'class="error" role="alert"' in await response.text()
+
+    persona = await client.get("/persona")
+    response = await client.post("/persona", data=persona_form(csrf(await persona.text())))
+    assert 'class="notice" role="status">保存成功。' in await response.text()
+
+
+async def test_provider_follow_and_reuse_preserve_saved_secrets(
+    authenticated: tuple[TestClient, FakeManager, Path],
+) -> None:
+    client, manager, root = authenticated
+    current = load_private_settings(root)
+    save_private_settings(
+        root,
+        current.model_copy(
+            update={
+                "memory": ProviderSettings(
+                    provider="openai_compatible",
+                    base_url="https://memory.example.com/v1",
+                    model="memory-model",
+                    api_key="memory-secret-value",
+                )
+            }
+        ),
+    )
+    token = csrf(await (await client.get("/models")).text())
+
+    response = await client.post(
+        "/models",
+        data=model_form(
+            token,
+            memory_provider="openai_compatible",
+            memory_base_url="https://memory.example.com/v1",
+            memory_model="memory-model",
+            memory_api_key="",
+            vision_reuse_chat_api_key="on",
+        ),
+    )
+
+    assert response.status == 200
+    saved = load_private_settings(root)
+    assert saved.memory is not None
+    assert saved.memory.api_key == "memory-secret-value"
+    assert saved.vision_reuse_chat_api_key is True
+    assert saved.vision.api_key == "vision-secret-value"
+    assert manager.updated == 1
+
+    response = await client.post(
+        "/models",
+        data=model_form(token, memory_follow_primary="on"),
+    )
+    assert response.status == 200
+    assert load_private_settings(root).memory is None
+
+
+async def test_deepseek_optional_provider_defaults_are_applied_server_side(
+    authenticated: tuple[TestClient, FakeManager, Path],
+) -> None:
+    client, _, root = authenticated
+    token = csrf(await (await client.get("/models")).text())
+
+    response = await client.post(
+        "/models",
+        data=model_form(
+            token,
+            memory_provider="deepseek",
+            memory_base_url="",
+            memory_model="",
+            memory_api_key="memory-key",
+        ),
+    )
+
+    assert response.status == 200
+    memory = load_private_settings(root).memory
+    assert memory is not None
+    assert memory.base_url == "https://api.deepseek.com"
+    assert memory.model == "deepseek-chat"
+
+
 async def test_blank_secret_preserves_and_explicit_clear_removes_value(
     authenticated: tuple[TestClient, FakeManager, Path],
 ) -> None:
@@ -302,6 +419,7 @@ async def test_blank_secret_preserves_and_explicit_clear_removes_value(
     assert private.chat.api_key == "chat-secret-value"
     assert private.vision.api_key == "vision-secret-value"
     assert manager.updated == 1
+    assert "保存成功" in await response.text()
 
     response = await client.post(
         "/models",
