@@ -526,6 +526,7 @@ async def _models_post(request: web.Request) -> web.Response:
     current: PrivateSettings | None = None
     try:
         current = load_private_settings(state.root)
+        vision_fields_present = "vision_provider" in form
         value = PrivateSettings(
             napcat_ws_url=str(form.get("napcat_ws_url", "")),
             napcat_access_token=_secret(form, "napcat_access_token", current.napcat_access_token),
@@ -534,8 +535,16 @@ async def _models_post(request: web.Request) -> web.Response:
             if form.get("memory_follow_primary") == "on" or "memory_provider" not in form
             else _provider(form, "memory", current.memory or current.chat),
             vision_enabled=form.get("vision_enabled") == "on",
-            vision_reuse_chat_api_key=form.get("vision_reuse_chat_api_key") == "on",
-            vision=_provider(form, "vision", current.vision),
+            vision_reuse_chat_api_key=(
+                form.get("vision_reuse_chat_api_key") == "on"
+                if vision_fields_present
+                else current.vision_reuse_chat_api_key
+            ),
+            vision=(
+                _provider(form, "vision", current.vision)
+                if vision_fields_present
+                else current.vision
+            ),
         )
         restart = (value.napcat_ws_url, value.napcat_access_token) != (
             current.napcat_ws_url,

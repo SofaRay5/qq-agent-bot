@@ -406,6 +406,38 @@ async def test_deepseek_optional_provider_defaults_are_applied_server_side(
     assert memory.model == "deepseek-chat"
 
 
+async def test_disabled_optional_fields_are_not_required_on_browser_submit(
+    authenticated: tuple[TestClient, FakeManager, Path],
+) -> None:
+    client, manager, root = authenticated
+    current = load_private_settings(root)
+    save_private_settings(root, current.model_copy(update={"vision_enabled": False}))
+    token = csrf(await (await client.get("/models")).text())
+
+    response = await client.post(
+        "/models",
+        data={
+            "csrf_token": token,
+            "napcat_ws_url": "ws://127.0.0.1:3001/",
+            "napcat_access_token": "new-nap-token",
+            "chat_provider": "deepseek",
+            "chat_base_url": "",
+            "chat_model": "",
+            "chat_api_key": "new-chat-key",
+            "memory_follow_primary": "on",
+        },
+    )
+
+    assert response.status == 200
+    saved = load_private_settings(root)
+    assert saved.napcat_access_token == "new-nap-token"
+    assert saved.chat.api_key == "new-chat-key"
+    assert saved.memory is None
+    assert saved.vision_enabled is False
+    assert saved.vision == current.vision
+    assert manager.updated == 1
+
+
 async def test_blank_secret_preserves_and_explicit_clear_removes_value(
     authenticated: tuple[TestClient, FakeManager, Path],
 ) -> None:
