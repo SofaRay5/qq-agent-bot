@@ -23,7 +23,7 @@ class HistoryMessage(NamedTuple):
 
 
 class BudgetExceeded(RuntimeError):
-    def __init__(self, reason: Literal["total", "proactive", "vision"]) -> None:
+    def __init__(self, reason: Literal["total", "proactive", "vision", "memory"]) -> None:
         super().__init__(f"Daily {reason} budget reached")
         self.reason = reason
 

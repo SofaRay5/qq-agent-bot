@@ -15,7 +15,7 @@
 - [superpowers/plans/2026-09-24-task7-image-understanding.md](superpowers/plans/2026-09-24-task7-image-understanding.md) — 已批准并执行的 Task 7 识图实施计划。
 - [superpowers/plans/2026-09-24-task8-groupmate-behavior.md](superpowers/plans/2026-09-24-task8-groupmate-behavior.md) — 已批准并执行的 Task 8 群友行为实施计划。
 - [superpowers/plans/2026-09-25-task9-local-dashboard.md](superpowers/plans/2026-09-25-task9-local-dashboard.md) — Task 9 本地后台逐任务实施计划。
-- [superpowers/plans/2026-09-26-task10-sqlite-memory.md](superpowers/plans/2026-09-26-task10-sqlite-memory.md) — 待审阅的 Task 10 SQLite 长期记忆实施计划。
+- [superpowers/plans/2026-09-26-task10-sqlite-memory.md](superpowers/plans/2026-09-26-task10-sqlite-memory.md) — 已批准并执行的 Task 10 SQLite 长期记忆实施计划。
 - [QQ机器人工程化设计文档.md](QQ机器人工程化设计文档.md) — 长期目标架构的参考选项；MVP 不要求一次实现全部内容。
 
 ## 工程规范与流程
@@ -24,6 +24,7 @@
 - [Task7测试指南.md](Task7测试指南.md) — 验证默认关闭、真实识图、失败隔离和每日额度。
 - [Task8测试指南.md](Task8测试指南.md) — 验证人格、上下文、群聊触发、费用边界及组合识图。
 - [Task9测试指南.md](Task9测试指南.md) — 浏览器后台登录、配置、启动停止和真实 Mac 验收。
+- [Task10测试指南.md](Task10测试指南.md) — SQLite 长期记忆的配置、管理、检查、备份和真实验收。
 - [CODING_STANDARDS.md](CODING_STANDARDS.md) — 编码规范：类型标注/docstring、异常处理、
   日志 vs print、模块跨层调用边界。
 - [DEV_WORKFLOW.md](DEV_WORKFLOW.md) — 日常开发流程速查：commit/push 步骤、commit

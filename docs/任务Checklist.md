@@ -72,11 +72,15 @@
 - [ ] **Task 10：SQLite 数据库记忆**
   - [x] 总设计中的目标与边界已确认，并参考 LangGraph、Mem0、Zep、Letta 的做法。
   - [x] Task 10 专项 spec 审阅通过（2026-09-26）。
-  - [ ] Task 10 实施计划审阅通过。
-  - [ ] 对话后自动提炼稳定事实、偏好和少量重要原话。
-  - [ ] 记忆按私聊用户、群内用户及群共享范围隔离。
-  - [ ] 记录来源、更新矛盾事实、限制召回数量与长度。
-  - [ ] 后台查看、修改、删除；重启保留与隔离验收。
+  - [x] Task 10 实施计划审阅通过（2026-09-26）。
+  - [x] SQLite 原子记忆、来源、版本历史和永久删除。
+  - [x] 对话后自动提炼稳定事实、偏好和少量重要原话。
+  - [x] 私聊用户、群内用户及群共享范围的程序级隔离。
+  - [x] 本地相关性召回，最多 5 条、约 1500 字。
+  - [x] 每日记忆额度、主模型复用和独立记忆模型覆盖。
+  - [x] 后台查看、筛选、添加、修改、复制、删除及按范围清空。
+  - [x] 自动化覆盖重启保留、范围隔离、故障降级和后台安全边界。
+  - [ ] 真实 NapCat + QQ + 模型的长期记忆验收。
 - [ ] **Task 11：服务器持续运行**
   - [x] 总设计中的目标与边界已确认；作为确定要做的额外任务。
   - [ ] 服务器就绪后细化并审阅 Task 11 spec。
@@ -90,4 +94,5 @@
 - [AI 群友扩展总设计](superpowers/specs/2026-09-24-ai-groupmate-expansion-design.md)
 - [Task 7 实施计划](superpowers/plans/2026-09-24-task7-image-understanding.md)
 - [Task 8 实施计划](superpowers/plans/2026-09-24-task8-groupmate-behavior.md)
+- [Task 10 实施计划](superpowers/plans/2026-09-26-task10-sqlite-memory.md)
 - [Task 1–6 实施计划](superpowers/plans/2026-09-23-qq-bot-mvp.md)

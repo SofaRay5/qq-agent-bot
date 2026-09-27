@@ -57,7 +57,11 @@ class MemoryContext:
     group_id: int | None = None
 
     def __post_init__(self) -> None:
-        if not _valid_id(self.user_id) or self.group_id is not None and not _valid_id(self.group_id):
+        if (
+            not _valid_id(self.user_id)
+            or self.group_id is not None
+            and not _valid_id(self.group_id)
+        ):
             raise ValueError("Invalid memory context")
 
     @classmethod
@@ -454,7 +458,9 @@ def _version_from_row(row: sqlite3.Row) -> MemoryVersion:
         current=bool(row["is_current"]),
         content=row["content"],
         importance=row["importance"],
-        source=MemorySource(row["source_message_id"], row["source_message_time"], row["source_excerpt"]),
+        source=MemorySource(
+            row["source_message_id"], row["source_message_time"], row["source_excerpt"]
+        ),
         created_by=row["created_by"],
         created_at=row["created_at"],
     )
@@ -495,7 +501,9 @@ def _record_from_row(row: sqlite3.Row) -> MemoryRecord:
         current=bool(row["is_current"]),
         content=row["content"],
         importance=row["importance"],
-        source=MemorySource(row["source_message_id"], row["source_message_time"], row["source_excerpt"]),
+        source=MemorySource(
+            row["source_message_id"], row["source_message_time"], row["source_excerpt"]
+        ),
         created_by=row["created_by"],
         created_at=row["version_created_at"],
     )

@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import sqlite3
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from html import escape
 from pathlib import Path
@@ -326,6 +326,7 @@ def _settings_fields(value: Settings) -> str:
         ("daily_model_calls", "每日总调用"),
         ("daily_proactive_calls", "每日主动调用"),
         ("daily_vision_calls", "每日识图调用"),
+        ("daily_memory_calls", "每日记忆提炼调用"),
     ):
         fields += input_field(label, name, getattr(value, name), "number")
     return fields
@@ -350,6 +351,7 @@ def _settings_fields_from_form(form: Mapping[str, object]) -> str:
         ("daily_model_calls", "每日总调用"),
         ("daily_proactive_calls", "每日主动调用"),
         ("daily_vision_calls", "每日识图调用"),
+        ("daily_memory_calls", "每日记忆提炼调用"),
     ):
         fields += input_field(label, name, form.get(name, ""), "number")
     return fields
@@ -363,6 +365,7 @@ def _settings_from_form(form: Mapping[str, object]) -> Settings:
         daily_model_calls=int(str(form.get("daily_model_calls", ""))),
         daily_proactive_calls=int(str(form.get("daily_proactive_calls", ""))),
         daily_vision_calls=int(str(form.get("daily_vision_calls", ""))),
+        daily_memory_calls=int(str(form.get("daily_memory_calls", ""))),
         proactive_mode=str(form.get("proactive_mode", "")),  # type: ignore[arg-type]
         proactive_probability=float(str(form.get("proactive_probability", ""))),
         minimum_reply_interval_seconds=float(str(form.get("minimum_reply_interval_seconds", ""))),
@@ -741,6 +744,9 @@ async def _memory_response(
     session = _session(request)
     assert session is not None
     state = _state(request)
+    records: Sequence[MemoryRecord] = ()
+    visible: Sequence[MemoryRecord] = ()
+    histories: Sequence[tuple[MemoryVersion, ...]] = ()
     try:
         values = request.query
         scope_kind = str(values.get("scope_kind", ""))

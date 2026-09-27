@@ -104,6 +104,19 @@ async def test_memory_paginates_at_fifty(
     assert "分页记忆 0" in second
 
 
+async def test_invalid_memory_filter_returns_safe_field_error(
+    memory_client: tuple[TestClient, MemoryStore, Path],
+) -> None:
+    client, _, root = memory_client
+
+    response = await client.get("/memory?scope_kind=private&group_id=9&user_id=1")
+    text = await response.text()
+
+    assert response.status == 400
+    assert "筛选条件无效" in text
+    assert str(root) not in text
+
+
 async def test_owner_can_add_edit_copy_delete_and_clear_exact_scope(
     memory_client: tuple[TestClient, MemoryStore, Path],
 ) -> None:

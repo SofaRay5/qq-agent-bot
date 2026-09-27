@@ -332,21 +332,21 @@ git commit -m "feat: manage long-term memory in dashboard"
 - Consumes: all implemented Task 10 behavior.
 - Produces exact operating, inspection, backup and real-service acceptance instructions.
 
-- [ ] **Step 1: Run focused Task 10 compatibility tests.**
+- [x] **Step 1: Run focused Task 10 compatibility tests.**
 
 Run: `uv run pytest tests/test_memory_store.py tests/test_memory_extractor.py tests/test_groupmate_reply.py tests/test_groupmate.py tests/test_bot_runtime.py tests/test_bot.py tests/test_dashboard_app.py tests/test_dashboard_memory.py -q`
 
 Expected: PASS.
 
-- [ ] **Step 2: Write the Task 10 operating guide.**
+- [x] **Step 2: Write the Task 10 operating guide.**
 
 Document automatic extraction, scope isolation, version history, deletion, daily limits, primary/override providers, browser administration, safe `sqlite3` read-only queries, database backup while stopped, and the eight real acceptance steps from the spec.
 
-- [ ] **Step 3: Update progress only with current evidence.**
+- [x] **Step 3: Update progress only with current evidence.**
 
 Add the guide and plan to `docs/README.md`; mark implemented Task 10 subtasks complete. Leave real NapCat/QQ/model memory acceptance unchecked until the user performs it. Do not change Task 7/8 real acceptance.
 
-- [ ] **Step 4: Run the one full verification pass.**
+- [x] **Step 4: Run the one full verification pass.**
 
 Run: `uv run pre-commit run --all-files`
 
@@ -356,7 +356,7 @@ Run: `git diff --check`
 
 Expected: no output and exit 0.
 
-- [ ] **Step 5: Commit Task 10.8 and stop before Task 11.**
+- [x] **Step 5: Commit Task 10.8 and stop before Task 11.**
 
 ```bash
 git add README.md docs/README.md docs/任务Checklist.md docs/Task10测试指南.md docs/superpowers/plans/2026-09-26-task10-sqlite-memory.md

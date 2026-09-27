@@ -1,11 +1,11 @@
 import asyncio
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from memory.store import MemoryContext, MemoryScope, MemorySource, MemoryStore
-
 
 SOURCE = MemorySource(message_id="10", message_time=20, excerpt="用户原话")
 
@@ -15,7 +15,7 @@ def test_scope_constructors_validate_ids() -> None:
     assert MemoryScope.group_user(2, 1).key == ("group_user", 2, 1)
     assert MemoryScope.group_shared(2).key == ("group_shared", 2, None)
 
-    invalid = (
+    invalid: tuple[Callable[[], object], ...] = (
         lambda: MemoryScope.private(0),
         lambda: MemoryScope.group_user(-1, 1),
         lambda: MemoryScope.group_user(1, 0),

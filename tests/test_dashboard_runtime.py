@@ -53,9 +53,7 @@ def private() -> PrivateSettings:
 class FakeService:
     instances: list["FakeService"] = []
 
-    def __init__(
-        self, *_args: object, on_state: object = None, on_error: object = None
-    ) -> None:
+    def __init__(self, *_args: object, on_state: object = None, on_error: object = None) -> None:
         self.on_state = on_state
         self.on_error = on_error
         self.started = asyncio.Event()

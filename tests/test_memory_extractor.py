@@ -197,7 +197,8 @@ async def test_accepts_strict_memory_operations(
             }
         ),
         '{"operations":[{"action":"update","target_id":999,"content":"新内容","importance":2}]}',
-        '{"operations":[{"action":"create","kind":"fact","content":"我的密码是 abc","importance":2}]}',
+        '{"operations":[{"action":"create","kind":"fact",'
+        '"content":"我的密码是 abc","importance":2}]}',
     ],
 )
 async def test_rejects_invalid_model_protocol(
@@ -225,9 +226,7 @@ async def test_rejects_duplicates_and_cross_scope_updates(
         await extractor.extract(candidate(), (existing(),))
 
     update = {
-        "operations": [
-            {"action": "update", "target_id": 7, "content": "群内事实", "importance": 2}
-        ]
+        "operations": [{"action": "update", "target_id": 7, "content": "群内事实", "importance": 2}]
     }
     extractor, _, _, _ = build_extractor(monkeypatch, json.dumps(update, ensure_ascii=False))
     with pytest.raises(ValueError, match="Invalid memory extraction"):

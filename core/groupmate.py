@@ -111,9 +111,7 @@ class GroupmateCoordinator:
         )
         return self._states.setdefault(key, SessionState())
 
-    def _memory_context(
-        self, event: PrivateMessageEvent | GroupMessageEvent
-    ) -> MemoryContext:
+    def _memory_context(self, event: PrivateMessageEvent | GroupMessageEvent) -> MemoryContext:
         if isinstance(event, GroupMessageEvent):
             return MemoryContext.group(event.group_id, event.user_id)
         return MemoryContext.private(event.user_id)
@@ -400,9 +398,7 @@ class GroupmateCoordinator:
                 except Exception as exc:
                     logger.error("memory recall failed: %s", type(exc).__name__)
             answer = await asyncio.wait_for(
-                runtime.reply(
-                    tuple(state.history), current, mode, budget_kind, memories=memories
-                ),
+                runtime.reply(tuple(state.history), current, mode, budget_kind, memories=memories),
                 timeout=MODEL_TIMEOUT_SECONDS,
             )
         except BudgetExceeded as exc:
