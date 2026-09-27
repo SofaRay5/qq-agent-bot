@@ -131,23 +131,23 @@ git commit -m "feat: configure memory models and budgets"
 - Produces: `MemoryCandidate`, `MemoryOperation`, `MemoryExtractor` and `should_extract(text: str) -> bool`.
 - `MemoryExtractor(provider, budget)` exposes async `extract(candidate, existing) -> tuple[MemoryOperation, ...]`.
 
-- [ ] **Step 1: Write failing local-filter and protocol tests.**
+- [x] **Step 1: Write failing local-filter and protocol tests.**
 
 Assert empty, image-only, fixed-error, very short and credential-like messages are rejected locally; stable facts, preferences, corrections and explicit group agreements remain candidates. Pin password, Token, verification-code, ID-card, bank-card and precise-address examples.
 
-- [ ] **Step 2: Implement the local candidate filter.**
+- [x] **Step 2: Implement the local candidate filter.**
 
 Use bounded deterministic rules only; false negatives are safer than persisting sensitive data. Do not add a classifier dependency.
 
-- [ ] **Step 3: Write failing model extraction tests.**
+- [x] **Step 3: Write failing model extraction tests.**
 
 Patch the chat model and assert strict JSON accepts only `ignore`, `create` and in-scope `update`; rejects unknown fields, more than 3 operations, content over 500 characters, excerpts over 300 characters, duplicate creates, missing targets, cross-scope IDs and sensitive output. Assert one memory reservation and safe failures for empty/malformed model content.
 
-- [ ] **Step 4: Implement `MemoryExtractor`.**
+- [x] **Step 4: Implement `MemoryExtractor`.**
 
 Follow the existing DeepSeek/OpenAI-compatible construction pattern from `agent/groupmate.py`, disable retries, reserve `memory` before the call, and return an empty operation tuple without calling the model when the memory quota is exhausted.
 
-- [ ] **Step 5: Verify and commit Task 10.3.**
+- [x] **Step 5: Verify and commit Task 10.3.**
 
 Run: `uv run pytest tests/test_memory_extractor.py -q`
 
