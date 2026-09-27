@@ -53,8 +53,11 @@ def private() -> PrivateSettings:
 class FakeService:
     instances: list["FakeService"] = []
 
-    def __init__(self, *_args: object, on_state: object = None) -> None:
+    def __init__(
+        self, *_args: object, on_state: object = None, on_error: object = None
+    ) -> None:
         self.on_state = on_state
+        self.on_error = on_error
         self.started = asyncio.Event()
         self.closed = 0
         self.updates: list[tuple[Settings, Persona, PrivateSettings]] = []
@@ -104,6 +107,7 @@ async def test_connection_callback_and_runtime_update_use_running_service(tmp_pa
     await service.started.wait()
 
     assert callable(service.on_state)
+    assert callable(service.on_error)
     service.on_state("connected")
     assert manager.state == "connected"
     service.on_state("reconnecting")
@@ -134,3 +138,12 @@ def test_safe_error_buffer_is_bounded_and_never_keeps_exception_message() -> Non
     assert len(entries) == 20
     assert {entry.category for entry in entries} == {"model_timeout", "ValueError"}
     assert "private-message-secret" not in repr(entries)
+
+
+def test_memory_error_uses_safe_category_without_details() -> None:
+    errors = SafeErrorBuffer()
+
+    errors.add("memory_failed")
+
+    assert errors.entries[-1].category == "memory_failed"
+    assert "database" not in repr(errors.entries)

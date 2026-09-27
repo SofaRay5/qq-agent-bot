@@ -49,6 +49,7 @@ class Dispatcher:
 
     async def close(self) -> None:
         """Cancel and await outstanding reply tasks during shutdown."""
+        await self.coordinator.close()
         tasks = tuple(self._tasks)
         for task in tasks:
             task.cancel()

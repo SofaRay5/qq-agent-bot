@@ -46,6 +46,7 @@ class FakeCoordinator:
         self.sent_ids: list[int | None] = []
         self.started = asyncio.Event()
         self.block = False
+        self.closed = 0
 
     async def handle(
         self,
@@ -57,6 +58,9 @@ class FakeCoordinator:
         if self.block:
             await asyncio.Event().wait()
         self.sent_ids.append(await send("协调器回复"))
+
+    async def close(self) -> None:
+        self.closed += 1
 
 
 async def settle(dispatcher: Dispatcher) -> None:
@@ -287,3 +291,4 @@ async def test_close_cancels_and_awaits_coordinator(
     await dispatcher.close()
 
     assert not dispatcher._tasks
+    assert coordinator.closed == 1

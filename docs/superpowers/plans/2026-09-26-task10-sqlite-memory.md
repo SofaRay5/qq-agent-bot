@@ -216,23 +216,23 @@ git commit -m "feat: recall and queue long-term memory"
 - Extends `BotService(..., on_error: Callable[[str | BaseException], None] | None = None)`; memory wrappers report only `memory_failed` to this callback.
 - `Dispatcher.close()` closes the coordinator before the OneBot client.
 
-- [ ] **Step 1: Write failing assembly and lifecycle tests.**
+- [x] **Step 1: Write failing assembly and lifecycle tests.**
 
 Assert startup initializes the store before connecting, chat and memory default to the same provider, independent memory override is used when set, runtime updates change later extraction without replacing the store, and close drains only the active write. A malformed memory schema must add a safe error and leave ordinary chat usable.
 
-- [ ] **Step 2: Implement store/extractor assembly and safe degradation.**
+- [x] **Step 2: Implement store/extractor assembly and safe degradation.**
 
 Use `data/memory.db`; pass callable hooks through `GroupmateRuntime`. Catch store/extractor failures in the runtime wrappers, call `on_error("memory_failed")`, and do not expose them through OneBot messages.
 
-- [ ] **Step 3: Write a fake NapCat restart-persistence test.**
+- [x] **Step 3: Write a fake NapCat restart-persistence test.**
 
 Create a memory through a fake extraction result, stop the service, create a new service on the same root, and assert a later reply receives the current memory while another user/group does not.
 
-- [ ] **Step 4: Implement lifecycle cleanup and safe error mapping.**
+- [x] **Step 4: Implement lifecycle cleanup and safe error mapping.**
 
 Add `memory_failed` to dashboard-safe categories; never store exception text, prompts or source excerpts in the error buffer.
 
-- [ ] **Step 5: Verify and commit Task 10.5.**
+- [x] **Step 5: Verify and commit Task 10.5.**
 
 Run: `uv run pytest tests/test_bot_runtime.py tests/test_dispatcher.py tests/test_bot.py tests/test_dashboard_runtime.py -q`
 

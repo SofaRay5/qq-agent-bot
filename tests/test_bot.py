@@ -70,7 +70,9 @@ class FakeReply:
             model="deepseek-flash",
             api_key="test-api-key",
         )
-        self.calls: list[tuple[tuple[HistoryMessage, ...], str, ReplyMode, str]] = []
+        self.calls: list[
+            tuple[tuple[HistoryMessage, ...], str, ReplyMode, str, tuple[str, ...]]
+        ] = []
         self.instances.append(self)
 
     async def __call__(
@@ -79,8 +81,9 @@ class FakeReply:
         current: str,
         mode: ReplyMode,
         budget_kind: str,
+        memories: Sequence[str] = (),
     ) -> str | None:
-        self.calls.append((tuple(history), current, mode, budget_kind))
+        self.calls.append((tuple(history), current, mode, budget_kind, tuple(memories)))
         if "silent-body" in current:
             return None
         if "quota-body" in current:

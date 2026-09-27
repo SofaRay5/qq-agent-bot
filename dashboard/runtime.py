@@ -17,6 +17,7 @@ SAFE_ERROR_CATEGORIES = {
     "image_failed",
     "model_failed",
     "model_timeout",
+    "memory_failed",
     "napcat_disconnected",
 }
 
@@ -81,6 +82,7 @@ class BotManager:
                     settings,
                     persona,
                     on_state=self._connection_state,
+                    on_error=self._errors.add,
                 )
             except Exception as exc:
                 self._state = "stopped"

@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import cast
 
@@ -7,6 +8,8 @@ import bot_runtime as runtime_module
 from bot_runtime import BotService
 from config.models import Persona, PrivateSettings, ProviderSettings, Settings
 from core.groupmate import GroupmateRuntime
+from memory.extractor import MemoryCandidate, MemoryOperation
+from memory.store import MemoryContext, MemoryScope, MemorySource, MemoryStore
 
 
 def settings(**changes: object) -> Settings:
@@ -58,6 +61,46 @@ def private(*, vision: bool = False) -> PrivateSettings:
     )
 
 
+class FakeMemoryStore:
+    instances: list["FakeMemoryStore"] = []
+    fail_initialize = False
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.initialized = False
+        self.instances.append(self)
+
+    async def initialize(self) -> None:
+        if self.fail_initialize:
+            raise ValueError("private database detail")
+        self.initialized = True
+
+
+class FakeExtractor:
+    instances: list["FakeExtractor"] = []
+
+    def __init__(self, provider_value: ProviderSettings, budget: object) -> None:
+        self.provider = provider_value
+        self.budget = budget
+        self.instances.append(self)
+
+    async def extract(
+        self,
+        candidate: MemoryCandidate,
+        _existing: object,
+    ) -> tuple[MemoryOperation, ...]:
+        return (
+            MemoryOperation(
+                action="create",
+                scope=candidate.scope,
+                kind="preference",
+                content="喜欢草莓蛋糕",
+                importance=3,
+                source=candidate.source,
+            ),
+        )
+
+
 class FakeClient:
     instances: list["FakeClient"] = []
 
@@ -69,6 +112,7 @@ class FakeClient:
         self.instances.append(self)
 
     async def run(self, _on_event: object) -> None:
+        assert FakeMemoryStore.instances[0].initialized or FakeMemoryStore.fail_initialize
         self.ran = True
 
     async def get_image_file(self, _file: str) -> str:
@@ -129,11 +173,16 @@ def fake_components(monkeypatch: pytest.MonkeyPatch) -> None:
     FakeClient.instances.clear()
     FakeCoordinator.instances.clear()
     FakeDispatcher.instances.clear()
+    FakeMemoryStore.instances.clear()
+    FakeMemoryStore.fail_initialize = False
+    FakeExtractor.instances.clear()
     monkeypatch.setattr(runtime_module, "OneBotClient", FakeClient)
     monkeypatch.setattr(runtime_module, "GroupmateReply", FakeReply)
     monkeypatch.setattr(runtime_module, "VisionDescriber", FakeVision)
     monkeypatch.setattr(runtime_module, "GroupmateCoordinator", FakeCoordinator)
     monkeypatch.setattr(runtime_module, "Dispatcher", FakeDispatcher)
+    monkeypatch.setattr(runtime_module, "MemoryStore", FakeMemoryStore)
+    monkeypatch.setattr(runtime_module, "MemoryExtractor", FakeExtractor)
 
 
 @pytest.mark.asyncio
@@ -173,3 +222,72 @@ def test_service_update_replaces_only_message_runtime(tmp_path: Path) -> None:
     assert runtime.persona_name == "新薯"
     assert cast(FakeReply, runtime.reply).provider == updated_private.chat
     assert cast(FakeVision, runtime.vision).provider == updated_private.vision
+
+
+@pytest.mark.asyncio
+async def test_memory_store_and_provider_are_assembled_and_reused(tmp_path: Path) -> None:
+    errors: list[str | BaseException] = []
+    initial = private()
+    service = BotService(tmp_path, initial, settings(), persona(), on_error=errors.append)
+
+    assert FakeMemoryStore.instances[0].path == tmp_path / "data/memory.db"
+    assert FakeExtractor.instances[0].provider == initial.chat
+    assert callable(FakeCoordinator.instances[0].kwargs["recall"])
+    assert callable(FakeCoordinator.instances[0].kwargs["extract"])
+
+    independent = initial.model_copy(update={"memory": provider("memory-model")})
+    service.update(settings(), persona(), independent)
+
+    assert len(FakeMemoryStore.instances) == 1
+    assert FakeExtractor.instances[-1].provider == independent.memory
+    assert FakeCoordinator.instances[0].replacements[-1].extract is not None
+
+    await service.run()
+    assert errors == []
+
+
+@pytest.mark.asyncio
+async def test_memory_initialization_failure_is_safe_and_chat_still_runs(tmp_path: Path) -> None:
+    FakeMemoryStore.fail_initialize = True
+    errors: list[str | BaseException] = []
+    service = BotService(tmp_path, private(), settings(), persona(), on_error=errors.append)
+
+    await service.run()
+
+    assert FakeClient.instances[0].ran
+    assert errors == ["memory_failed"]
+
+
+@pytest.mark.asyncio
+async def test_restart_reuses_sqlite_memory_without_cross_scope_leaks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(runtime_module, "MemoryStore", MemoryStore)
+    source = MemorySource(message_id="10", message_time=20, excerpt="我喜欢草莓蛋糕")
+    candidate = MemoryCandidate(
+        scope=MemoryScope.private(1),
+        text="我喜欢草莓蛋糕",
+        source=source,
+    )
+
+    first = BotService(tmp_path, private(), settings(), persona())
+    await first._initialize_memory()
+    extract = cast(
+        Callable[[tuple[MemoryCandidate, ...]], Awaitable[None]],
+        FakeCoordinator.instances[-1].kwargs["extract"],
+    )
+    await extract((candidate,))
+    await first.close()
+
+    second = BotService(tmp_path, private(), settings(), persona())
+    await second._initialize_memory()
+    recall = cast(
+        Callable[[MemoryContext, str], Awaitable[tuple[str, ...]]],
+        FakeCoordinator.instances[-1].kwargs["recall"],
+    )
+
+    assert await recall(MemoryContext.private(1), "草莓") == ("喜欢草莓蛋糕",)
+    assert await recall(MemoryContext.private(2), "草莓") == ()
+    assert await recall(MemoryContext.group(9, 1), "草莓") == ()
+    await second.close()
